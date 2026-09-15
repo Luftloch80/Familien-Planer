@@ -1,12 +1,17 @@
 import ical from 'node-ical'
 
-// Öffentliche iCal-Adresse des geteilten Google-Kalenders (aus dem Embed-Link
-// abgeleitet: .../embed?src=<kalender-id> -> .../ical/<kalender-id>/public/basic.ics).
-const ICS_URL =
-  'https://calendar.google.com/calendar/ical/gruenegardefilderer%40gmail.com/public/basic.ics'
+// Die geheime iCal-Adresse des geteilten Google-Kalenders (aus den
+// Kalendereinstellungen -> "Kalender integrieren" -> "Geheime Adresse im
+// iCal-Format"). Liegt als Umgebungsvariable in Vercel, nicht im Code,
+// da der Kalender nicht öffentlich ist.
+const ICS_URL = process.env.ICS_URL
 const HORIZON_DAYS = 90
 
 export default async function handler(req, res) {
+  if (!ICS_URL) {
+    res.status(500).json({ error: 'ICS_URL ist nicht konfiguriert' })
+    return
+  }
   try {
     const data = await ical.async.fromURL(ICS_URL)
     const from = new Date()
