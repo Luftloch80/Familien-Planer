@@ -14,6 +14,18 @@ function eventLine(title, time, endTime) {
   return `${title} ${time}${endTime ? `–${endTime}` : ''}`
 }
 
+// Nur als Text statt Farbe, da der Drucker schwarz-weiß ist: "Frei" (zu
+// Hause), "Flugtag" (Flug oder Layover unterwegs) und "Anreise" für
+// Übergangstage (früher Check-in am Folgetag oder Umlauf-Start heute).
+function dutyLabel(dateISO, data) {
+  const isOrange = (data.orangeDates ?? []).includes(dateISO)
+  if (isOrange) return 'Anreise'
+  const isFlight = (data.flightDates ?? []).includes(dateISO)
+  const isAway = (data.awayDates ?? []).includes(dateISO)
+  if (isFlight || isAway) return 'Flugtag'
+  return 'Frei'
+}
+
 // Baut für jeden Tag des Monats eine Zeile: Datumsbezeichnung + pro Kind
 // entweder "frei"/Ferien-Label oder die Abhol-Optionen + passende Termine.
 // Wird sowohl für die Bildschirm-Tabelle als auch für den PDF-Export genutzt.
@@ -48,7 +60,7 @@ function buildRows(days, kids, data) {
         holiday: null,
       }
     })
-    return { dateLabel, cells, isWeekend: !weekday }
+    return { dateLabel, cells, isWeekend: !weekday, duty: dutyLabel(dateISO, data) }
   })
 }
 
@@ -57,6 +69,7 @@ export default function MonthOverview({ data, onClose }) {
   const [year, setYear] = useState(now.getFullYear())
   const [monthIndex, setMonthIndex] = useState(now.getMonth())
   const [selectedKidIds, setSelectedKidIds] = useState(() => KIDS.map((k) => k.id))
+  const [showDuty, setShowDuty] = useState(true)
   const [generating, setGenerating] = useState(false)
 
   function changeMonth(delta) {
@@ -99,19 +112,22 @@ export default function MonthOverview({ data, onClose }) {
 
       const pageWidth = doc.internal.pageSize.getWidth()
       const dateColWidth = 20
-      const kidColWidth = (pageWidth - 24 - dateColWidth) / kids.length
+      const dutyColWidth = showDuty ? 18 : 0
+      const kidColWidth = (pageWidth - 24 - dateColWidth - dutyColWidth) / kids.length
       const columnStyles = { 0: { cellWidth: dateColWidth } }
       kids.forEach((_, i) => {
         columnStyles[i + 1] = { cellWidth: kidColWidth }
       })
+      if (showDuty) columnStyles[kids.length + 1] = { cellWidth: dutyColWidth }
 
       autoTable(doc, {
         startY: 15,
         margin: { left: 12, right: 12 },
-        head: [['Datum', ...kids.map((k) => k.name)]],
+        head: [['Datum', ...kids.map((k) => k.name), ...(showDuty ? ['Dienstplan'] : [])]],
         body: rows.map((r) => [
           r.dateLabel,
           ...r.cells.map((c) => [c.holiday, ...c.lines].filter(Boolean).join('\n')),
+          ...(showDuty ? [r.duty] : []),
         ]),
         theme: 'grid',
         styles: {
@@ -168,6 +184,10 @@ export default function MonthOverview({ data, onClose }) {
             <span style={{ color: kid.color }}>{kid.name}</span>
           </label>
         ))}
+        <label className="month-kid-checkbox">
+          <input type="checkbox" checked={showDuty} onChange={() => setShowDuty((s) => !s)} />
+          <span>Dienstplan</span>
+        </label>
       </div>
 
       <table className="month-table">
@@ -177,6 +197,7 @@ export default function MonthOverview({ data, onClose }) {
             {kids.map((kid) => (
               <th key={kid.id}>{kid.name}</th>
             ))}
+            {showDuty && <th>Dienstplan</th>}
           </tr>
         </thead>
         <tbody>
@@ -191,6 +212,7 @@ export default function MonthOverview({ data, onClose }) {
                   ))}
                 </td>
               ))}
+              {showDuty && <td>{row.duty}</td>}
             </tr>
           ))}
         </tbody>
