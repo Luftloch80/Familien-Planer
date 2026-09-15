@@ -667,6 +667,10 @@
   background: var(--early-bg);
 }
 
+.calendar-cell-flight {
+  background: var(--flight-red-bg);
+}
+
 .calendar-cell-today {
   border-color: var(--accent);
 }
