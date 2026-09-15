@@ -117,12 +117,15 @@ export default function CalendarView({ data }) {
             // 09:00 heute) und bekannten Layover-Tagen (awayDates) gilt als
             // Zuhause-Tag, auch ohne explizite Daten.
             const isHome = !isFlightDay && !isOrange && !isAway
-            const isRedFlight = isFlightDay && !isOrange
+            // Rot: reine Flugtage (nicht orange) und Layover-Tage ohne
+            // eigenen Flug (awayDates) - beides Tage, an denen man nicht
+            // zu Hause ist.
+            const isRed = (isFlightDay && !isOrange) || isAway
             const cellClass = [
               'calendar-cell',
               !info.school ? 'calendar-cell-off' : '',
               isHome ? 'calendar-cell-home' : '',
-              isRedFlight ? 'calendar-cell-flight' : '',
+              isRed ? 'calendar-cell-red' : '',
               isOrange ? 'calendar-cell-early' : '',
               isToday ? 'calendar-cell-today' : '',
               isSelected ? 'calendar-cell-selected' : '',

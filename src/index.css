@@ -11,7 +11,6 @@
   --danger-rgb: 192, 67, 58;
   --ok: #2f9e58;
   --home-bg: #d3f3d8;
-  --early-bg: #fbdfb0;
   --flight-red-bg: #f6cfcb;
 
   font: 16px/1.5 -apple-system, 'Segoe UI', system-ui, Roboto, sans-serif;
@@ -32,7 +31,6 @@
     --accent-rgb: 168, 155, 255;
     --accent-contrast: #17161a;
     --home-bg: #1f3d28;
-    --early-bg: #4a3116;
     --flight-red-bg: #4a2320;
   }
 }
