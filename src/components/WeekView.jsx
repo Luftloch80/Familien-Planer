@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { KIDS } from '../data/kids.js'
 import { getWeekDays, addDays, formatShort, isSameDate, toISODate } from '../lib/dates.js'
 import { isSchoolDay, holidayLabel } from '../lib/holidays.js'
-import { allPickupTimesMatch } from '../lib/pickup.js'
+import { pickupTimeMatches } from '../lib/pickup.js'
 import KidDayCard from './KidDayCard.jsx'
 
 export default function WeekView({ data, store }) {
@@ -26,7 +26,7 @@ export default function WeekView({ data, store }) {
         {days.map((date) => {
           const holiday = holidayLabel(date)
           const school = isSchoolDay(date)
-          const sameTime = school ? allPickupTimesMatch(KIDS, date, data) : null
+          const matches = school ? pickupTimeMatches(KIDS, date, data) : []
           return (
             <div className="day-column" key={toISODate(date)}>
               <div className={`day-heading ${isSameDate(date, today) ? 'is-today' : ''}`}>
@@ -34,14 +34,14 @@ export default function WeekView({ data, store }) {
                 <span className="day-date">{formatShort(date)}</span>
               </div>
               {school ? (
-                KIDS.map((kid) => (
+                KIDS.map((kid, i) => (
                   <KidDayCard
                     key={kid.id}
                     kid={kid}
                     date={date}
                     data={data}
                     store={store}
-                    sameTime={sameTime}
+                    sameTime={matches[i] ?? null}
                   />
                 ))
               ) : (
