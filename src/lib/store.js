@@ -253,12 +253,14 @@ export function useFamilyStore() {
   )
 
   // Abgelaufene einmalige Termine räumen sich von selbst auf, sobald ihr
-  // Datum in der Vergangenheit liegt - keine manuelle Pflege nötig.
+  // (End-)Datum in der Vergangenheit liegt - keine manuelle Pflege nötig.
+  // Termine ganz ohne Datum haben kein Ablaufdatum und bleiben stehen.
   useEffect(() => {
     if (!ready || !data) return
     const todayISO = toISODate(new Date())
     for (const [id, event] of Object.entries(data.oneOffEvents ?? {})) {
-      if (event.date < todayISO) removeOneOffEvent(id)
+      const lastDate = event.endDate || event.date
+      if (lastDate && lastDate < todayISO) removeOneOffEvent(id)
     }
   }, [ready, data, removeOneOffEvent])
 

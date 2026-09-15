@@ -7,6 +7,13 @@ function daysInMonth(year, monthIndex) {
   return new Date(year, monthIndex + 1, 0).getDate()
 }
 
+// Baut aus Titel + optionaler Start-/Enduhrzeit eine Anzeigezeile, z.B.
+// "Zahnarzt 14:00–15:00", "Zahnarzt 14:00" oder nur "Zahnarzt" ohne Uhrzeit.
+function eventLine(title, time, endTime) {
+  if (!time) return title
+  return `${title} ${time}${endTime ? `–${endTime}` : ''}`
+}
+
 // Baut für jeden Tag des Monats eine Zeile: Datumsbezeichnung + pro Kind
 // entweder "frei"/Ferien-Label oder die Abhol-Optionen + passende Termine.
 // Wird sowohl für die Bildschirm-Tabelle als auch für den PDF-Export genutzt.
@@ -18,10 +25,12 @@ function buildRows(days, kids, data) {
     const dateISO = toISODate(date)
     const dateLabel = `${date.toLocaleDateString('de-DE', { weekday: 'short' })} ${date.getDate()}.`
     const cells = kids.map((kid) => {
+      // Mehrtägige Termine (date...endDate) erscheinen an jedem Tag im Zeitraum.
+      // Termine ganz ohne Datum lassen sich keinem Tag zuordnen und fehlen hier.
       const oneOff = Object.values(data.oneOffEvents ?? {}).filter(
-        (ev) => ev.kidId === kid.id && ev.date === dateISO,
+        (ev) => ev.kidId === kid.id && ev.date && dateISO >= ev.date && dateISO <= (ev.endDate || ev.date),
       )
-      const oneOffLines = oneOff.map((e) => `${e.reason} ${e.time}`)
+      const oneOffLines = oneOff.map((e) => eventLine(e.reason, e.time, e.endTime))
 
       if (!weekday) return { lines: oneOffLines, holiday: null }
       if (!school) return { lines: oneOffLines, holiday: holiday ?? 'frei' }
@@ -33,7 +42,7 @@ function buildRows(days, kids, data) {
       return {
         lines: [
           ...options.map((o) => `${o.label} ${o.time}`),
-          ...recurring.map((e) => `${e.title} ${e.time}`),
+          ...recurring.map((e) => eventLine(e.title, e.time, e.endTime)),
           ...oneOffLines,
         ],
         holiday: null,

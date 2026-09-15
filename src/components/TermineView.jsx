@@ -13,6 +13,18 @@ function formatDateDMY(iso) {
   return `${d}.${m}.${y}`
 }
 
+function dateRangeLabel(date, endDate) {
+  if (!date) return ''
+  if (endDate && endDate !== date) return `${formatDateDMY(date)}–${formatDateDMY(endDate)}`
+  return formatDateDMY(date)
+}
+
+function timeRangeLabel(time, endTime) {
+  if (!time) return ''
+  if (endTime) return `${time}–${endTime}`
+  return time
+}
+
 export default function TermineView({ data, store, onOpenMonthOverview }) {
   return (
     <div className="view">
@@ -89,7 +101,9 @@ function RecurringEventsForKid({ kid, data, store }) {
   const [editingId, setEditingId] = useState(null)
 
   const events = Object.entries(data.recurringEvents?.[kid.id] ?? {}).sort(
-    (a, b) => WEEKDAYS.indexOf(a[1].weekday) - WEEKDAYS.indexOf(b[1].weekday) || a[1].time.localeCompare(b[1].time),
+    (a, b) =>
+      WEEKDAYS.indexOf(a[1].weekday) - WEEKDAYS.indexOf(b[1].weekday) ||
+      (a[1].time || '99:99').localeCompare(b[1].time || '99:99'),
   )
 
   return (
@@ -112,7 +126,7 @@ function RecurringEventsForKid({ kid, data, store }) {
             ) : (
               <li key={id} className="recurring-item">
                 <span>
-                  {ev.weekday}s {ev.time} – {ev.title}
+                  {ev.weekday}s{ev.time ? ` ${timeRangeLabel(ev.time, ev.endTime)}` : ''} – {ev.title}
                 </span>
                 <span className="recurring-item-actions">
                   <button
@@ -138,7 +152,7 @@ function RecurringEventsForKid({ kid, data, store }) {
 
       {adding ? (
         <EventForm
-          initial={{ weekday: WEEKDAYS[0], time: '16:00', title: '' }}
+          initial={{ weekday: WEEKDAYS[0], time: '', endTime: '', title: '' }}
           submitLabel="Hinzufügen"
           onSubmit={(value) => {
             store.addRecurringEvent(kid.id, value)
@@ -161,7 +175,11 @@ function OneOffEventsForKid({ kid, data, store }) {
 
   const events = Object.entries(data.oneOffEvents ?? {})
     .filter(([, ev]) => ev.kidId === kid.id)
-    .sort((a, b) => a[1].date.localeCompare(b[1].date) || a[1].time.localeCompare(b[1].time))
+    .sort(
+      (a, b) =>
+        (a[1].date || '9999-99-99').localeCompare(b[1].date || '9999-99-99') ||
+        (a[1].time || '99:99').localeCompare(b[1].time || '99:99'),
+    )
 
   return (
     <div>
@@ -183,7 +201,11 @@ function OneOffEventsForKid({ kid, data, store }) {
             ) : (
               <li key={id} className="recurring-item">
                 <span>
-                  {formatDateDMY(ev.date)} {ev.time} – {ev.reason}
+                  {[dateRangeLabel(ev.date, ev.endDate), timeRangeLabel(ev.time, ev.endTime)]
+                    .filter(Boolean)
+                    .join(' ')}
+                  {ev.date || ev.time ? ' – ' : ''}
+                  {ev.reason}
                 </span>
                 <span className="recurring-item-actions">
                   <button
@@ -209,7 +231,7 @@ function OneOffEventsForKid({ kid, data, store }) {
 
       {adding ? (
         <OneOffEventForm
-          initial={{ date: '', time: '16:00', reason: '' }}
+          initial={{ date: '', endDate: '', time: '', endTime: '', reason: '' }}
           submitLabel="Hinzufügen"
           onSubmit={(value) => {
             store.addOneOffEvent({ ...value, kidId: kid.id })
@@ -227,14 +249,23 @@ function OneOffEventsForKid({ kid, data, store }) {
 }
 
 function OneOffEventForm({ initial, submitLabel, onSubmit, onCancel }) {
-  const [date, setDate] = useState(initial.date)
-  const [time, setTime] = useState(initial.time)
+  const [date, setDate] = useState(initial.date ?? '')
+  const [endDate, setEndDate] = useState(initial.endDate ?? '')
+  const [time, setTime] = useState(initial.time ?? '')
+  const [endTime, setEndTime] = useState(initial.endTime ?? '')
   const [reason, setReason] = useState(initial.reason)
 
   function submit() {
     const trimmed = reason.trim()
-    if (!trimmed || !date || !time) return
-    onSubmit({ ...initial, date, time, reason: trimmed })
+    if (!trimmed) return
+    onSubmit({
+      ...initial,
+      date,
+      endDate: date ? endDate : '',
+      time,
+      endTime: time ? endTime : '',
+      reason: trimmed,
+    })
   }
 
   return (
@@ -242,6 +273,11 @@ function OneOffEventForm({ initial, submitLabel, onSubmit, onCancel }) {
       <div className="add-person-row">
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         <TimeSelect value={time} onChange={setTime} />
+      </div>
+      <div className="add-person-row">
+        <span className="form-inline-label">bis</span>
+        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} disabled={!date} />
+        <TimeSelect value={endTime} onChange={setEndTime} disabled={!time} />
       </div>
       <div className="add-person-row">
         <input
@@ -266,13 +302,14 @@ function OneOffEventForm({ initial, submitLabel, onSubmit, onCancel }) {
 
 function EventForm({ initial, submitLabel, onSubmit, onCancel }) {
   const [weekday, setWeekday] = useState(initial.weekday)
-  const [time, setTime] = useState(initial.time)
+  const [time, setTime] = useState(initial.time ?? '')
+  const [endTime, setEndTime] = useState(initial.endTime ?? '')
   const [title, setTitle] = useState(initial.title)
 
   function submit() {
     const trimmed = title.trim()
-    if (!trimmed || !time) return
-    onSubmit({ weekday, time, title: trimmed })
+    if (!trimmed) return
+    onSubmit({ weekday, time, endTime: time ? endTime : '', title: trimmed })
   }
 
   return (
@@ -286,6 +323,10 @@ function EventForm({ initial, submitLabel, onSubmit, onCancel }) {
           ))}
         </select>
         <TimeSelect value={time} onChange={setTime} />
+      </div>
+      <div className="add-person-row">
+        <span className="form-inline-label">bis</span>
+        <TimeSelect value={endTime} onChange={setEndTime} disabled={!time} />
       </div>
       <div className="add-person-row">
         <input

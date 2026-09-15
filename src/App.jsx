@@ -7,7 +7,7 @@ import MonthOverview from './components/MonthOverview.jsx'
 import './App.css'
 
 const TABS = [
-  { id: 'today', label: 'Heute', icon: '☀️' },
+  { id: 'today', label: 'Schule', icon: '🏫' },
   { id: 'termine', label: 'Termine', icon: '📅' },
   { id: 'settings', label: 'Einstellungen', icon: '⚙️' },
 ]
