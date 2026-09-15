@@ -664,7 +664,7 @@
 }
 
 .calendar-cell-early {
-  background: linear-gradient(135deg, var(--home-bg) 50%, var(--flight-red-bg) 50%);
+  background: linear-gradient(90deg, var(--home-bg) 50%, var(--flight-red-bg) 50%);
 }
 
 .calendar-cell-red {
