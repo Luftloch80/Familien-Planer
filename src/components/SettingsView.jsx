@@ -149,7 +149,10 @@ function OneOffEvents({ data, store }) {
   const [editingId, setEditingId] = useState(null)
 
   const events = Object.entries(data.oneOffEvents ?? {}).sort(
-    (a, b) => a[1].date.localeCompare(b[1].date) || a[1].time.localeCompare(b[1].time),
+    (a, b) =>
+      KIDS.findIndex((k) => k.id === a[1].kidId) - KIDS.findIndex((k) => k.id === b[1].kidId) ||
+      a[1].date.localeCompare(b[1].date) ||
+      a[1].time.localeCompare(b[1].time),
   )
 
   function kidOf(id) {
