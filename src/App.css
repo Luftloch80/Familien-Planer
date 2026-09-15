@@ -24,6 +24,76 @@
   margin-bottom: 16px;
 }
 
+.view-no-padding {
+  margin: -20px -16px 0;
+}
+
+.view-header-padded {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.view-header-padded.view-header {
+  margin-top: 16px;
+}
+
+/* Day scroller */
+.day-scroller {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 14px 16px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.day-scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.day-pill {
+  scroll-snap-align: center;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 52px;
+  padding: 8px 0;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.day-pill-weekday {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+}
+
+.day-pill-date {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-pill-today {
+  border-color: var(--accent);
+}
+
+.day-pill-active {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.day-pill-active .day-pill-weekday,
+.day-pill-active .day-pill-date {
+  color: var(--accent-contrast);
+}
+
 .view-header h1 {
   font-size: 26px;
   margin: 0 0 2px;

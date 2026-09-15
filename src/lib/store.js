@@ -3,7 +3,11 @@ import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore'
 import { db, familyDocRef, isFirebaseConfigured } from './firebase.js'
 
 const LOCAL_KEY = 'familienplaner-data'
-const DEFAULT_DATA = { people: ['Mama', 'Papa'], assignments: {}, exceptions: {} }
+const DEFAULT_DATA = {
+  people: ['Familie Droste', 'Familie Klein', 'Familie Heyer', 'Sonstige'],
+  assignments: {},
+  exceptions: {},
+}
 
 function readLocal() {
   try {
