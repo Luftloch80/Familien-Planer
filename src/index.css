@@ -5,8 +5,10 @@
   --text-muted: #756f7d;
   --border: #e7e4e0;
   --accent: #6a5acd;
+  --accent-rgb: 106, 90, 205;
   --accent-contrast: #ffffff;
   --danger: #c0433a;
+  --danger-rgb: 192, 67, 58;
   --ok: #2f9e58;
 
   font: 16px/1.5 -apple-system, 'Segoe UI', system-ui, Roboto, sans-serif;
@@ -24,6 +26,7 @@
     --text-muted: #a49dae;
     --border: #322e39;
     --accent: #a89bff;
+    --accent-rgb: 168, 155, 255;
     --accent-contrast: #17161a;
   }
 }

@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { KIDS } from '../data/kids.js'
 import { weekdayName, addDays, formatShort, isSameDate } from '../lib/dates.js'
 import { isSchoolDay, holidayLabel } from '../lib/holidays.js'
-import { resolvePickup } from '../lib/pickup.js'
 import KidDayCard from './KidDayCard.jsx'
 import DayScroller from './DayScroller.jsx'
 
@@ -25,12 +24,6 @@ export default function TodayView({ data, store }) {
   const holiday = holidayLabel(target)
   const isSchool = isSchoolDay(target)
 
-  const results = isSchool
-    ? KIDS.map((kid) => ({ kid, result: resolvePickup(kid, target, data) })).sort((a, b) =>
-        (a.result?.time ?? '').localeCompare(b.result?.time ?? ''),
-      )
-    : []
-
   return (
     <div className="view view-no-padding">
       <DayScroller selected={target} onSelect={setTarget} />
@@ -44,7 +37,7 @@ export default function TodayView({ data, store }) {
 
       <div className="today-list view-header-padded">
         {isSchool ? (
-          results.map(({ kid }) => (
+          KIDS.map((kid) => (
             <KidDayCard key={kid.id} kid={kid} date={target} data={data} store={store} />
           ))
         ) : (
