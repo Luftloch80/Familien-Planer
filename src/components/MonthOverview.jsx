@@ -73,19 +73,29 @@ export default function MonthOverview({ data, onClose }) {
     try {
       const { jsPDF } = await import('jspdf')
       const autoTable = (await import('jspdf-autotable')).default
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-      doc.setFontSize(14)
-      doc.text(`Monatsübersicht ${monthLabel}`, 14, 12)
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      doc.setFontSize(13)
+      doc.text(`Monatsübersicht ${monthLabel}`, 12, 10)
+
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const dateColWidth = 20
+      const kidColWidth = (pageWidth - 24 - dateColWidth) / kids.length
+      const columnStyles = { 0: { cellWidth: dateColWidth } }
+      kids.forEach((_, i) => {
+        columnStyles[i + 1] = { cellWidth: kidColWidth }
+      })
 
       autoTable(doc, {
-        startY: 18,
+        startY: 15,
+        margin: { left: 12, right: 12 },
         head: [['Datum', ...kids.map((k) => k.name)]],
         body: rows.map((r) => [
           r.dateLabel,
           ...r.cells.map((c) => c.holiday ?? c.lines.join('\n')),
         ]),
-        styles: { fontSize: 9, cellPadding: 2, valign: 'top' },
+        styles: { fontSize: 7, cellPadding: 1.2, valign: 'top' },
         headStyles: { fillColor: [106, 90, 205] },
+        columnStyles,
         didParseCell: (hookData) => {
           if (hookData.section === 'body' && rows[hookData.row.index]?.isWeekend) {
             hookData.cell.styles.fillColor = [245, 245, 245]
@@ -116,7 +126,7 @@ export default function MonthOverview({ data, onClose }) {
           </button>
         </div>
         <button className="btn-small btn-primary" onClick={showPdf} disabled={generating}>
-          {generating ? 'Erstelle PDF…' : 'PDF anzeigen (Querformat)'}
+          {generating ? 'Erstelle PDF…' : 'PDF anzeigen'}
         </button>
       </div>
 
