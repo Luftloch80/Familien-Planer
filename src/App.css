@@ -177,7 +177,7 @@
   grid-template-columns: minmax(76px, 0.95fr) minmax(112px, 1.3fr) minmax(64px, 0.85fr);
   gap: 6px 8px;
   padding: 12px 10px;
-  align-items: center;
+  align-items: start;
 }
 
 .kid-col {
@@ -272,6 +272,7 @@
   font-size: 18px;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
 }
 
