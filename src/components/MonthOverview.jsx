@@ -107,12 +107,12 @@ export default function MonthOverview({ data }) {
       const { jsPDF } = await import('jspdf')
       const autoTable = (await import('jspdf-autotable')).default
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-      doc.setFontSize(13)
-      doc.text(`Monatsübersicht ${monthLabel}`, 12, 10)
+      doc.setFontSize(14)
+      doc.text(`Monatsübersicht ${monthLabel}`, 105, 12, { align: 'center' })
 
       const pageWidth = doc.internal.pageSize.getWidth()
-      const dateColWidth = 20
-      const dutyColWidth = showDuty ? 18 : 0
+      const dateColWidth = 18
+      const dutyColWidth = showDuty ? 20 : 0
       const kidColWidth = (pageWidth - 24 - dateColWidth - dutyColWidth) / kids.length
       const columnStyles = { 0: { cellWidth: dateColWidth } }
       kids.forEach((_, i) => {
@@ -121,7 +121,7 @@ export default function MonthOverview({ data }) {
       if (showDuty) columnStyles[kids.length + 1] = { cellWidth: dutyColWidth }
 
       autoTable(doc, {
-        startY: 15,
+        startY: 18,
         margin: { left: 12, right: 12 },
         head: [['Datum', ...kids.map((k) => k.name), ...(showDuty ? ['Dienstplan'] : [])]],
         body: rows.map((r) => [
@@ -131,8 +131,8 @@ export default function MonthOverview({ data }) {
         ]),
         theme: 'grid',
         styles: {
-          fontSize: 7,
-          cellPadding: 1.2,
+          fontSize: 7.5,
+          cellPadding: 1.4,
           valign: 'top',
           lineWidth: 0.3,
           lineColor: [90, 90, 90],
