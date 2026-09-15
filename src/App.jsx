@@ -3,6 +3,7 @@ import { useFamilyStore } from './lib/store.js'
 import TodayView from './components/TodayView.jsx'
 import WeekView from './components/WeekView.jsx'
 import SettingsView from './components/SettingsView.jsx'
+import MonthOverview from './components/MonthOverview.jsx'
 import './App.css'
 
 const TABS = [
@@ -13,6 +14,7 @@ const TABS = [
 
 export default function App() {
   const [tab, setTab] = useState('today')
+  const [showMonthOverview, setShowMonthOverview] = useState(false)
   const store = useFamilyStore()
   const { data, ready, synced } = store
 
@@ -24,12 +26,23 @@ export default function App() {
     )
   }
 
+  if (showMonthOverview) {
+    return <MonthOverview data={data} onClose={() => setShowMonthOverview(false)} />
+  }
+
   return (
     <div className="app">
       <main className="app-content">
         {tab === 'today' && <TodayView data={data} store={store} />}
         {tab === 'week' && <WeekView data={data} store={store} />}
-        {tab === 'settings' && <SettingsView synced={synced} />}
+        {tab === 'settings' && (
+          <SettingsView
+            data={data}
+            store={store}
+            synced={synced}
+            onOpenMonthOverview={() => setShowMonthOverview(true)}
+          />
+        )}
       </main>
 
       <nav className="tab-bar">
