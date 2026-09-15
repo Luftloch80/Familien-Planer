@@ -13,6 +13,7 @@ const DEFAULT_DATA = {
   oneOffEvents: {},
   flightDates: [],
   earlyCheckinDates: [],
+  awayDates: [],
 }
 
 function readLocal() {
