@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { isFirebaseConfigured } from '../lib/firebase.js'
 import { HOLIDAYS } from '../lib/holidays.js'
 import { KIDS, WEEKDAYS } from '../data/kids.js'
+import TimeSelect from './TimeSelect.jsx'
 
 function formatHolidayDate(iso) {
   const [y, m, d] = iso.split('-')
@@ -108,7 +109,7 @@ function RecurringEventsForKid({ kid, data, store }) {
               </option>
             ))}
           </select>
-          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+          <TimeSelect value={time} onChange={setTime} />
         </div>
         <div className="add-person-row">
           <input

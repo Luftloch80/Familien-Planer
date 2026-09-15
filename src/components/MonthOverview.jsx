@@ -11,6 +11,7 @@ export default function MonthOverview({ data, onClose }) {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [monthIndex, setMonthIndex] = useState(now.getMonth())
+  const [selectedKidIds, setSelectedKidIds] = useState(() => KIDS.map((k) => k.id))
 
   function changeMonth(delta) {
     let m = monthIndex + delta
@@ -26,12 +27,19 @@ export default function MonthOverview({ data, onClose }) {
     setYear(y)
   }
 
+  function toggleKid(id) {
+    setSelectedKidIds((prev) =>
+      prev.includes(id) ? prev.filter((k) => k !== id) : [...prev, id],
+    )
+  }
+
   const monthLabel = new Date(year, monthIndex, 1).toLocaleDateString('de-DE', {
     month: 'long',
     year: 'numeric',
   })
 
   const days = Array.from({ length: daysInMonth(year, monthIndex) }, (_, i) => new Date(year, monthIndex, i + 1))
+  const kids = KIDS.filter((k) => selectedKidIds.includes(k.id))
 
   return (
     <div className="month-overview">
@@ -53,13 +61,26 @@ export default function MonthOverview({ data, onClose }) {
         </button>
       </div>
 
+      <div className="month-kid-picker no-print">
+        {KIDS.map((kid) => (
+          <label key={kid.id} className="month-kid-checkbox">
+            <input
+              type="checkbox"
+              checked={selectedKidIds.includes(kid.id)}
+              onChange={() => toggleKid(kid.id)}
+            />
+            <span style={{ color: kid.color }}>{kid.name}</span>
+          </label>
+        ))}
+      </div>
+
       <h1 className="month-overview-title">Monatsübersicht {monthLabel}</h1>
 
       <table className="month-table">
         <thead>
           <tr>
             <th>Datum</th>
-            {KIDS.map((kid) => (
+            {kids.map((kid) => (
               <th key={kid.id}>{kid.name}</th>
             ))}
           </tr>
@@ -74,7 +95,7 @@ export default function MonthOverview({ data, onClose }) {
                 <td className="month-date-cell">
                   {date.toLocaleDateString('de-DE', { weekday: 'short' })} {date.getDate()}.
                 </td>
-                {KIDS.map((kid) => {
+                {kids.map((kid) => {
                   if (!weekday) return <td key={kid.id} />
                   if (!school) {
                     return (
