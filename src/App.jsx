@@ -3,7 +3,6 @@ import { useFamilyStore } from './lib/store.js'
 import TodayView from './components/TodayView.jsx'
 import TermineView from './components/TermineView.jsx'
 import CalendarView from './components/CalendarView.jsx'
-import MonthOverview from './components/MonthOverview.jsx'
 import './App.css'
 
 const TABS = [
@@ -14,7 +13,6 @@ const TABS = [
 
 export default function App() {
   const [tab, setTab] = useState('today')
-  const [showMonthOverview, setShowMonthOverview] = useState(false)
   const store = useFamilyStore()
   const { data, ready } = store
 
@@ -26,17 +24,11 @@ export default function App() {
     )
   }
 
-  if (showMonthOverview) {
-    return <MonthOverview data={data} onClose={() => setShowMonthOverview(false)} />
-  }
-
   return (
     <div className="app">
       <main className="app-content">
         {tab === 'today' && <TodayView data={data} store={store} />}
-        {tab === 'termine' && (
-          <TermineView data={data} store={store} onOpenMonthOverview={() => setShowMonthOverview(true)} />
-        )}
+        {tab === 'termine' && <TermineView data={data} store={store} />}
         {tab === 'calendar' && <CalendarView data={data} />}
       </main>
 

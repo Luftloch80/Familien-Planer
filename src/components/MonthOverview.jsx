@@ -64,7 +64,7 @@ function buildRows(days, kids, data) {
   })
 }
 
-export default function MonthOverview({ data, onClose }) {
+export default function MonthOverview({ data }) {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [monthIndex, setMonthIndex] = useState(now.getMonth())
@@ -154,26 +154,18 @@ export default function MonthOverview({ data, onClose }) {
   }
 
   return (
-    <div className="month-overview">
-      <div className="month-overview-toolbar no-print">
-        <button className="btn-small" onClick={onClose}>
-          ← Zurück
+    <>
+      <div className="month-nav">
+        <button className="nav-btn" onClick={() => changeMonth(-1)} aria-label="Vorheriger Monat">
+          ‹
         </button>
-        <div className="month-nav">
-          <button className="nav-btn" onClick={() => changeMonth(-1)} aria-label="Vorheriger Monat">
-            ‹
-          </button>
-          <strong>{monthLabel}</strong>
-          <button className="nav-btn" onClick={() => changeMonth(1)} aria-label="Nächster Monat">
-            ›
-          </button>
-        </div>
-        <button className="btn-small btn-primary" onClick={showPdf} disabled={generating}>
-          {generating ? 'Erstelle PDF…' : 'PDF anzeigen'}
+        <strong>{monthLabel}</strong>
+        <button className="nav-btn" onClick={() => changeMonth(1)} aria-label="Nächster Monat">
+          ›
         </button>
       </div>
 
-      <div className="month-kid-picker no-print">
+      <div className="month-kid-picker">
         {KIDS.map((kid) => (
           <label key={kid.id} className="month-kid-checkbox">
             <input
@@ -190,33 +182,9 @@ export default function MonthOverview({ data, onClose }) {
         </label>
       </div>
 
-      <table className="month-table">
-        <thead>
-          <tr>
-            <th>Datum</th>
-            {kids.map((kid) => (
-              <th key={kid.id}>{kid.name}</th>
-            ))}
-            {showDuty && <th>Dienstplan</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={toISODate(days[i])} className={row.isWeekend ? 'month-row-weekend' : ''}>
-              <td className="month-date-cell">{row.dateLabel}</td>
-              {row.cells.map((cell, j) => (
-                <td key={kids[j].id}>
-                  {cell.holiday && <span className="month-holiday-cell">{cell.holiday}</span>}
-                  {cell.lines.map((line, k) => (
-                    <div key={k}>{line}</div>
-                  ))}
-                </td>
-              ))}
-              {showDuty && <td>{row.duty}</td>}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+      <button className="btn-small btn-primary" onClick={showPdf} disabled={generating}>
+        {generating ? 'Erstelle PDF…' : 'PDF erstellen'}
+      </button>
+    </>
   )
 }

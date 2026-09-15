@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { HOLIDAYS } from '../lib/holidays.js'
 import { KIDS, WEEKDAYS } from '../data/kids.js'
 import TimeSelect from './TimeSelect.jsx'
+import MonthOverview from './MonthOverview.jsx'
 
 function formatHolidayDate(iso) {
   const [y, m, d] = iso.split('-')
@@ -25,7 +26,7 @@ function timeRangeLabel(time, endTime) {
   return time
 }
 
-export default function TermineView({ data, store, onOpenMonthOverview }) {
+export default function TermineView({ data, store }) {
   return (
     <div className="view">
       <div className="view-header">
@@ -38,12 +39,7 @@ export default function TermineView({ data, store, onOpenMonthOverview }) {
 
       <section className="settings-section">
         <h2>Monatsübersicht</h2>
-        <p className="status-warn">
-          Alle Abholzeiten und wiederkehrenden Termine eines Monats als PDF (Querformat).
-        </p>
-        <button className="btn-small btn-primary" onClick={onOpenMonthOverview}>
-          Monatsübersicht öffnen
-        </button>
+        <MonthOverview data={data} />
       </section>
 
       <section className="settings-section">
