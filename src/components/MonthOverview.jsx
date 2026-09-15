@@ -104,7 +104,14 @@ export default function MonthOverview({ data, onClose }) {
           r.dateLabel,
           ...r.cells.map((c) => [c.holiday, ...c.lines].filter(Boolean).join('\n')),
         ]),
-        styles: { fontSize: 7, cellPadding: 1.2, valign: 'top' },
+        theme: 'grid',
+        styles: {
+          fontSize: 7,
+          cellPadding: 1.2,
+          valign: 'top',
+          lineWidth: 0.15,
+          lineColor: [180, 180, 180],
+        },
         headStyles: { fillColor: [106, 90, 205] },
         columnStyles,
         didParseCell: (hookData) => {
