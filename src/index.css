@@ -10,6 +10,7 @@
   --danger: #c0433a;
   --danger-rgb: 192, 67, 58;
   --ok: #2f9e58;
+  --flight-bg: #cfeaf7;
 
   font: 16px/1.5 -apple-system, 'Segoe UI', system-ui, Roboto, sans-serif;
   color-scheme: light dark;
@@ -28,6 +29,7 @@
     --accent: #a89bff;
     --accent-rgb: 168, 155, 255;
     --accent-contrast: #17161a;
+    --flight-bg: #1f3a4d;
   }
 }
 

@@ -74,6 +74,7 @@ export default function CalendarView({ data }) {
 
   const selectedDate = days.find((d) => toISODate(d) === selectedISO) ?? null
   const selectedInfo = selectedDate ? dayInfo(selectedDate, data) : null
+  const selectedIsFlightDay = selectedInfo && (data.flightDates ?? []).includes(selectedInfo.dateISO)
 
   return (
     <div className="view">
@@ -106,9 +107,11 @@ export default function CalendarView({ data }) {
             const info = dayInfo(date, data)
             const isToday = isSameDate(date, now)
             const isSelected = info.dateISO === selectedISO
+            const isFlightDay = (data.flightDates ?? []).includes(info.dateISO)
             const cellClass = [
               'calendar-cell',
               !info.school ? 'calendar-cell-off' : '',
+              isFlightDay ? 'calendar-cell-flight' : '',
               isToday ? 'calendar-cell-today' : '',
               isSelected ? 'calendar-cell-selected' : '',
             ]
@@ -144,6 +147,8 @@ export default function CalendarView({ data }) {
               {selectedInfo.holiday ? `${selectedInfo.holiday} – keine Schule` : 'Kein Schultag'}
             </p>
           )}
+
+          {selectedIsFlightDay && <p className="status-warn">✈️ Flugtag</p>}
 
           {selectedInfo.perKid.every((p) => !p.pickup && p.recurring.length === 0 && p.oneOff.length === 0) ? (
             <p className="status-warn">Keine Termine an diesem Tag.</p>

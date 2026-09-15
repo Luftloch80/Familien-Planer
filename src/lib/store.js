@@ -11,6 +11,7 @@ const DEFAULT_DATA = {
   credentials: {},
   recurringEvents: {},
   oneOffEvents: {},
+  flightDates: [],
 }
 
 function readLocal() {
