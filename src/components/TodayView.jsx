@@ -1,16 +1,20 @@
 import { useState } from 'react'
 import { KIDS } from '../data/kids.js'
 import { weekdayName, addDays, formatShort, isSameDate } from '../lib/dates.js'
+import { isSchoolDay, holidayLabel } from '../lib/holidays.js'
 import { resolvePickup } from '../lib/pickup.js'
 import KidDayCard from './KidDayCard.jsx'
 import DayScroller from './DayScroller.jsx'
 
+const MAX_LOOKAHEAD_DAYS = 400
+
 function initialTarget() {
   const now = new Date()
-  if (weekdayName(now)) return now
-  // Wochenende -> nächster Montag
-  const offset = now.getDay() === 0 ? 1 : 2
-  return addDays(now, offset)
+  for (let offset = 0; offset < MAX_LOOKAHEAD_DAYS; offset++) {
+    const date = addDays(now, offset)
+    if (isSchoolDay(date)) return date
+  }
+  return now
 }
 
 export default function TodayView({ data, store }) {
@@ -18,8 +22,10 @@ export default function TodayView({ data, store }) {
   const today = new Date()
   const isToday = isSameDate(target, today)
   const weekday = weekdayName(target)
+  const holiday = holidayLabel(target)
+  const isSchool = isSchoolDay(target)
 
-  const results = weekday
+  const results = isSchool
     ? KIDS.map((kid) => ({ kid, result: resolvePickup(kid, target, data) })).sort((a, b) =>
         (a.result?.time ?? '').localeCompare(b.result?.time ?? ''),
       )
@@ -30,19 +36,19 @@ export default function TodayView({ data, store }) {
       <DayScroller selected={target} onSelect={setTarget} />
 
       <div className="view-header view-header-padded">
-        <h1>{isToday ? 'Heute' : weekday ? weekday : 'Wochenende'}</h1>
+        <h1>{isToday ? 'Heute' : weekday ?? 'Wochenende'}</h1>
         <p className="subtitle">
           {weekday ?? target.toLocaleDateString('de-DE', { weekday: 'long' })}, {formatShort(target)}
         </p>
       </div>
 
       <div className="today-list view-header-padded">
-        {weekday ? (
+        {isSchool ? (
           results.map(({ kid }) => (
             <KidDayCard key={kid.id} kid={kid} date={target} data={data} store={store} />
           ))
         ) : (
-          <p className="hint">An diesem Tag ist keine Schule.</p>
+          <p className="hint">{holiday ? `${holiday} – keine Schule.` : 'An diesem Tag ist keine Schule.'}</p>
         )}
       </div>
     </div>

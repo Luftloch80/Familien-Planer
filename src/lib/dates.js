@@ -1,4 +1,4 @@
-import { WEEKDAYS } from '../data/kids.js'
+export const WEEKDAYS = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag']
 
 export function toISODate(date) {
   const y = date.getFullYear()

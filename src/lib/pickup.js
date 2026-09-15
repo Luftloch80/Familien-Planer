@@ -1,15 +1,16 @@
 import { pickupOptions } from '../data/kids.js'
 import { weekdayName, toISODate } from './dates.js'
 import { assignmentKey } from './store.js'
+import { isSchoolDay } from './holidays.js'
 
 // Fasst Stundenplan-Optionen, Zuweisung (wer holt ab) und Tages-Ausnahme
 // zu einem konkreten Abhol-Ergebnis für ein Kind an einem Datum zusammen.
 export function resolvePickup(kid, date, data) {
   const weekday = weekdayName(date)
-  if (!weekday) return null // Wochenende
+  if (!weekday || !isSchoolDay(date)) return null // Wochenende oder Ferien
 
   const key = assignmentKey(toISODate(date), kid.id)
-  const options = pickupOptions(kid, weekday)
+  const options = pickupOptions(kid, weekday, date)
   const assignment = data.assignments[key]
   const exception = data.exceptions[key]
 

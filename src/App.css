@@ -475,3 +475,7 @@
   gap: 8px;
   font-size: 14px;
 }
+
+.schedule-note {
+  color: var(--text-muted);
+}

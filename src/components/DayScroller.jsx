@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react'
-import { addDays, isSameDate, toISODate, weekdayName } from '../lib/dates.js'
+import { addDays, isSameDate, toISODate } from '../lib/dates.js'
+import { isSchoolDay } from '../lib/holidays.js'
 
 const SCHOOL_DAYS_AHEAD = 30 // ca. 6 Wochen
+const MAX_LOOKAHEAD_DAYS = 400 // Sicherheitsgrenze, falls das Schuljahr zu Ende ist
 
 export default function DayScroller({ selected, onSelect }) {
   const scrollerRef = useRef(null)
@@ -9,12 +11,9 @@ export default function DayScroller({ selected, onSelect }) {
 
   const today = new Date()
   const days = []
-  for (let offset = 0, found = 0; found < SCHOOL_DAYS_AHEAD; offset++) {
+  for (let offset = 0; offset < MAX_LOOKAHEAD_DAYS && days.length < SCHOOL_DAYS_AHEAD; offset++) {
     const date = addDays(today, offset)
-    if (weekdayName(date)) {
-      days.push(date)
-      found++
-    }
+    if (isSchoolDay(date)) days.push(date)
   }
 
   useEffect(() => {

@@ -1,6 +1,8 @@
 // Abholzeiten Schuljahr 2026/27, Freie Waldorfschule Gutenhalde
 // Quelle: Stundenpläne der Kinder + Angaben der Eltern (Kernzeit-Anmeldung, AGs)
-export const WEEKDAYS = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag']
+import { startOfWeek } from '../lib/dates.js'
+
+export { WEEKDAYS } from '../lib/dates.js'
 
 export const KIDS = [
   {
@@ -13,7 +15,12 @@ export const KIDS = [
       Dienstag: { regular: '12:25' },
       Mittwoch: { regular: '11:35' },
       Donnerstag: { regular: '13:10' },
-      Freitag: { regular: '13:10', ag: { label: 'Chor', time: '15:30' } },
+      // Chor ist keine wählbare Option, sondern findet alle 2 Wochen statt
+      // (diese Woche = Chor-Woche, ab 14.09.2026).
+      Freitag: {
+        regular: '13:10',
+        biweekly: { label: 'Chor', time: '15:30', referenceMonday: '2026-09-14' },
+      },
     },
     kernzeit: null,
   },
@@ -51,12 +58,26 @@ export function getKid(id) {
   return KIDS.find((k) => k.id === id)
 }
 
-// Alle Abhol-Optionen (Zeit + Bezeichnung) für ein Kind an einem Wochentag
-export function pickupOptions(kid, weekday) {
+function isBiweeklyActiveWeek(date, referenceMondayISO) {
+  const monday = startOfWeek(date)
+  const ref = startOfWeek(new Date(`${referenceMondayISO}T00:00:00`))
+  const diffWeeks = Math.round((monday - ref) / (7 * 86400000))
+  return ((diffWeeks % 2) + 2) % 2 === 0
+}
+
+// Abhol-Optionen (Zeit + Bezeichnung) für ein Kind an einem konkreten Datum.
+// `date` wird für Regelungen gebraucht, die nicht jede Woche gleich sind (z.B. Chor alle 2 Wochen).
+export function pickupOptions(kid, weekday, date) {
   const day = kid.schedule[weekday]
   if (!day) return []
-  const options = [{ key: 'regular', label: 'Schulschluss', time: day.regular }]
-  if (day.ag) options.push({ key: 'ag', label: day.ag.label, time: day.ag.time })
+
+  const options = []
+  if (day.biweekly && date && isBiweeklyActiveWeek(date, day.biweekly.referenceMonday)) {
+    options.push({ key: 'regular', label: day.biweekly.label, time: day.biweekly.time })
+  } else {
+    options.push({ key: 'regular', label: 'Schulschluss', time: day.regular })
+  }
+
   if (kid.kernzeit) options.push({ key: 'kernzeit', label: 'Kernzeit Abholung', time: kid.kernzeit })
   return options.sort((a, b) => a.time.localeCompare(b.time))
 }

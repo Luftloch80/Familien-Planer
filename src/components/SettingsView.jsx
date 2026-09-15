@@ -1,6 +1,12 @@
 import { useState } from 'react'
 import { KIDS } from '../data/kids.js'
 import { isFirebaseConfigured } from '../lib/firebase.js'
+import { HOLIDAYS } from '../lib/holidays.js'
+
+function formatHolidayDate(iso) {
+  const [y, m, d] = iso.split('-')
+  return `${d}.${m}.${y.slice(2)}`
+}
 
 export default function SettingsView({ data, store, synced }) {
   const [newName, setNewName] = useState('')
@@ -73,6 +79,26 @@ export default function SettingsView({ data, store, synced }) {
                 .map(([day, s]) => `${day.slice(0, 2)} ${s.regular}`)
                 .join(' · ')}
               {kid.kernzeit && ` · Kernzeit bis ${kid.kernzeit}`}
+              {Object.entries(kid.schedule).map(
+                ([day, s]) =>
+                  s.biweekly && (
+                    <span key={day} className="schedule-note">
+                      {' '}
+                      · {s.biweekly.label} jede 2. Woche ({day}s) bis {s.biweekly.time}
+                    </span>
+                  ),
+              )}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="settings-section">
+        <h2>Ferien (keine Schule)</h2>
+        <ul className="kid-schedule-summary">
+          {HOLIDAYS.map((h) => (
+            <li key={h.label}>
+              {h.label}: {formatHolidayDate(h.start)} – {formatHolidayDate(h.end)}
             </li>
           ))}
         </ul>
