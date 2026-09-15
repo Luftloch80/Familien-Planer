@@ -108,19 +108,6 @@ export default function KidDayCard({ kid, date, data, store, compact = false, sa
             exception={exception}
             store={store}
           />
-
-          <div className="field-row">
-            <span className="field-label">Schüler entschuldigen</span>
-            <a className="external-link-btn" href={EXCUSE_URL} target="_blank" rel="noopener noreferrer">
-              🖊️ {kid.name} entschuldigen
-            </a>
-            {data.credentials?.[kid.id]?.username && (
-              <span className="schedule-note">
-                Login: {data.credentials[kid.id].username}
-                {data.credentials[kid.id].password && ` / ${data.credentials[kid.id].password}`}
-              </span>
-            )}
-          </div>
         </div>
       )}
     </div>
