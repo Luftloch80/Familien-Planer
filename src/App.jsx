@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { useFamilyStore } from './lib/store.js'
 import TodayView from './components/TodayView.jsx'
-import WeekView from './components/WeekView.jsx'
+import TermineView from './components/TermineView.jsx'
 import SettingsView from './components/SettingsView.jsx'
 import MonthOverview from './components/MonthOverview.jsx'
 import './App.css'
 
 const TABS = [
   { id: 'today', label: 'Heute', icon: '☀️' },
-  { id: 'week', label: 'Woche', icon: '📅' },
+  { id: 'termine', label: 'Termine', icon: '📅' },
   { id: 'settings', label: 'Einstellungen', icon: '⚙️' },
 ]
 
@@ -34,15 +34,10 @@ export default function App() {
     <div className="app">
       <main className="app-content">
         {tab === 'today' && <TodayView data={data} store={store} />}
-        {tab === 'week' && <WeekView data={data} store={store} />}
-        {tab === 'settings' && (
-          <SettingsView
-            data={data}
-            store={store}
-            synced={synced}
-            onOpenMonthOverview={() => setShowMonthOverview(true)}
-          />
+        {tab === 'termine' && (
+          <TermineView data={data} store={store} onOpenMonthOverview={() => setShowMonthOverview(true)} />
         )}
+        {tab === 'settings' && <SettingsView synced={synced} />}
       </main>
 
       <nav className="tab-bar">

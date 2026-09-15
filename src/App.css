@@ -111,12 +111,6 @@
   color: var(--accent);
 }
 
-.week-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
 .nav-btn {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -331,45 +325,6 @@
   color: var(--text);
   text-decoration: none;
   font-weight: 600;
-}
-
-/* Week view */
-.week-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(220px, 1fr));
-  gap: 12px;
-  overflow-x: auto;
-  padding-bottom: 8px;
-}
-
-@media (max-width: 760px) {
-  .week-grid {
-    grid-template-columns: 1fr;
-    overflow-x: visible;
-  }
-}
-
-.day-column {
-  min-width: 0;
-}
-
-.day-heading {
-  display: flex;
-  justify-content: space-between;
-  font-weight: 600;
-  padding: 6px 4px;
-  color: var(--text-muted);
-  border-bottom: 2px solid var(--border);
-  margin-bottom: 8px;
-}
-
-.day-heading.is-today {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
-
-.day-date {
-  font-variant-numeric: tabular-nums;
 }
 
 /* Settings view */
