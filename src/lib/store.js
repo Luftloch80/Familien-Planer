@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
-import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore'
+import { doc, onSnapshot, setDoc, updateDoc, deleteField } from 'firebase/firestore'
 import { db, familyDocRef, isFirebaseConfigured } from './firebase.js'
+import { toISODate } from './dates.js'
 
 const LOCAL_KEY = 'familienplaner-data'
 const DEFAULT_DATA = {
@@ -63,8 +64,12 @@ export function useFamilyStore() {
 
   const persistField = useCallback(async (path, value) => {
     if (isFirebaseConfigured && db) {
+      // null bedeutet hier "Feld löschen" - Firestore würde ein einfaches
+      // null aber nur als Nullwert speichern statt das Feld zu entfernen,
+      // was beim nächsten Laden zu kaputten (null) Einträgen führen würde.
+      const writeValue = value === null ? deleteField() : value
       try {
-        await updateDoc(familyDocRef, { [path]: value })
+        await updateDoc(familyDocRef, { [path]: writeValue })
       } catch {
         // updateDoc schlägt fehl, wenn das Dokument noch gar nicht existiert.
         // setDoc mit mergeFields schreibt garantiert NUR dieses eine Feld -
@@ -77,7 +82,7 @@ export function useFamilyStore() {
           cur[parts[i]] = {}
           cur = cur[parts[i]]
         }
-        cur[parts[parts.length - 1]] = value
+        cur[parts[parts.length - 1]] = writeValue
         try {
           await setDoc(familyDocRef, nested, { mergeFields: [path] })
         } catch {
@@ -246,6 +251,16 @@ export function useFamilyStore() {
     },
     [updateLocalAndMaybeRemote],
   )
+
+  // Abgelaufene einmalige Termine räumen sich von selbst auf, sobald ihr
+  // Datum in der Vergangenheit liegt - keine manuelle Pflege nötig.
+  useEffect(() => {
+    if (!ready || !data) return
+    const todayISO = toISODate(new Date())
+    for (const [id, event] of Object.entries(data.oneOffEvents ?? {})) {
+      if (event.date < todayISO) removeOneOffEvent(id)
+    }
+  }, [ready, data, removeOneOffEvent])
 
   return {
     data: data ?? DEFAULT_DATA,
