@@ -110,7 +110,6 @@ export default function MonthOverview({ data }) {
 
       // Immer genau 4 Blöcke à 7 Tage, da `days` schon exakt 4 volle Wochen ist.
       const blocks = [0, 1, 2, 3].map((i) => ({
-        weekNum: isoWeekNumber(days[i * 7]),
         days: days.slice(i * 7, i * 7 + 7),
         rows: rows.slice(i * 7, i * 7 + 7),
       }))
@@ -146,15 +145,6 @@ export default function MonthOverview({ data }) {
         const row = Math.floor(i / cols)
         const x = marginLeft + col * (blockWidth + gutter)
         const y = marginTop + row * (blockHeight + gutter)
-        const first = block.days[0]
-        const last = block.days[6]
-        const weekRangeLabel =
-          first.getMonth() === last.getMonth()
-            ? `${first.getDate()}.–${last.getDate()}.${last.getMonth() + 1}.`
-            : `${first.getDate()}.${first.getMonth() + 1}.–${last.getDate()}.${last.getMonth() + 1}.`
-
-        doc.setFontSize(9)
-        doc.text(`KW ${block.weekNum} · ${weekRangeLabel}`, x, y - 2)
 
         autoTable(doc, {
           startY: y,
