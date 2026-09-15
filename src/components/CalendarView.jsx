@@ -74,8 +74,9 @@ export default function CalendarView({ data }) {
 
   const selectedDate = days.find((d) => toISODate(d) === selectedISO) ?? null
   const selectedInfo = selectedDate ? dayInfo(selectedDate, data) : null
-  const selectedIsEarly = selectedInfo && (data.earlyCheckinDates ?? []).includes(selectedInfo.dateISO)
+  const selectedIsOrange = selectedInfo && (data.orangeDates ?? []).includes(selectedInfo.dateISO)
   const selectedIsAway = selectedInfo && (data.awayDates ?? []).includes(selectedInfo.dateISO)
+  const selectedIsFlightDay = selectedInfo && (data.flightDates ?? []).includes(selectedInfo.dateISO)
 
   return (
     <div className="view">
@@ -109,17 +110,18 @@ export default function CalendarView({ data }) {
             const isToday = isSameDate(date, now)
             const isSelected = info.dateISO === selectedISO
             const isFlightDay = (data.flightDates ?? []).includes(info.dateISO)
-            const isEarly = (data.earlyCheckinDates ?? []).includes(info.dateISO)
+            const isOrange = (data.orangeDates ?? []).includes(info.dateISO)
             const isAway = (data.awayDates ?? []).includes(info.dateISO)
             // Grün ist der Normalfall (zu Hause): alles außer Flugtagen, dem
-            // "früher Check-in morgen"-Hinweis und bekannten Layover-Tagen
-            // (awayDates) gilt als Zuhause-Tag, auch ohne explizite Daten.
-            const isHome = !isFlightDay && !isEarly && !isAway
+            // Orange-Hinweis (früher Check-in morgen oder Umlauf-Start nach
+            // 09:00 heute) und bekannten Layover-Tagen (awayDates) gilt als
+            // Zuhause-Tag, auch ohne explizite Daten.
+            const isHome = !isFlightDay && !isOrange && !isAway
             const cellClass = [
               'calendar-cell',
               !info.school ? 'calendar-cell-off' : '',
               isHome ? 'calendar-cell-home' : '',
-              isEarly ? 'calendar-cell-early' : '',
+              isOrange ? 'calendar-cell-early' : '',
               isToday ? 'calendar-cell-today' : '',
               isSelected ? 'calendar-cell-selected' : '',
             ]
@@ -157,7 +159,10 @@ export default function CalendarView({ data }) {
           )}
 
           {selectedIsAway && <p className="status-warn">🧳 Unterwegs</p>}
-          {selectedIsEarly && <p className="status-warn">🟠 Früher Check-in am nächsten Tag (vor 09:00)</p>}
+          {selectedIsOrange && selectedIsFlightDay && <p className="status-warn">🟠 Umlauf beginnt heute (nach 09:00)</p>}
+          {selectedIsOrange && !selectedIsFlightDay && (
+            <p className="status-warn">🟠 Früher Check-in am nächsten Tag (vor 09:00)</p>
+          )}
 
           {selectedInfo.perKid.every((p) => !p.pickup && p.recurring.length === 0 && p.oneOff.length === 0) ? (
             <p className="status-warn">Keine Termine an diesem Tag.</p>

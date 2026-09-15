@@ -12,7 +12,7 @@ const DEFAULT_DATA = {
   recurringEvents: {},
   oneOffEvents: {},
   flightDates: [],
-  earlyCheckinDates: [],
+  orangeDates: [],
   awayDates: [],
 }
 
