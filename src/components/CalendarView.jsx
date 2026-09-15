@@ -108,8 +108,12 @@ export default function CalendarView({ data }) {
             const info = dayInfo(date, data)
             const isToday = isSameDate(date, now)
             const isSelected = info.dateISO === selectedISO
+            const isFlightDay = (data.flightDates ?? []).includes(info.dateISO)
             const isEarly = (data.earlyCheckinDates ?? []).includes(info.dateISO)
-            const isHome = !isEarly && (data.homeDates ?? []).includes(info.dateISO)
+            // Grün ist der Normalfall (zu Hause): alles außer Flugtagen und
+            // dem "früher Check-in morgen"-Hinweis gilt als Zuhause-Tag,
+            // auch wenn dazu gar keine expliziten Daten vorliegen.
+            const isHome = !isFlightDay && !isEarly
             const cellClass = [
               'calendar-cell',
               !info.school ? 'calendar-cell-off' : '',
@@ -153,9 +157,7 @@ export default function CalendarView({ data }) {
 
           {selectedIsFlightDay && <p className="status-warn">✈️ Flugtag</p>}
           {selectedIsEarly && <p className="status-warn">🟠 Früher Check-in am nächsten Tag (vor 09:00)</p>}
-          {!selectedIsFlightDay && !selectedIsEarly && (data.homeDates ?? []).includes(selectedInfo.dateISO) && (
-            <p className="status-warn">🏠 Zu Hause</p>
-          )}
+          {!selectedIsFlightDay && !selectedIsEarly && <p className="status-warn">🏠 Zu Hause</p>}
 
           {selectedInfo.perKid.every((p) => !p.pickup && p.recurring.length === 0 && p.oneOff.length === 0) ? (
             <p className="status-warn">Keine Termine an diesem Tag.</p>
