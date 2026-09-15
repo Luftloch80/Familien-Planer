@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { isFirebaseConfigured } from '../lib/firebase.js'
 import { HOLIDAYS } from '../lib/holidays.js'
 
@@ -7,20 +6,7 @@ function formatHolidayDate(iso) {
   return `${d}.${m}.${y.slice(2)}`
 }
 
-export default function SettingsView({ data, store, synced }) {
-  const [newName, setNewName] = useState('')
-
-  function addPerson() {
-    const name = newName.trim()
-    if (!name || data.people.includes(name)) return
-    store.setPeople([...data.people, name])
-    setNewName('')
-  }
-
-  function removePerson(name) {
-    store.setPeople(data.people.filter((p) => p !== name))
-  }
-
+export default function SettingsView({ synced }) {
   return (
     <div className="view">
       <div className="view-header">
@@ -28,29 +14,14 @@ export default function SettingsView({ data, store, synced }) {
       </div>
 
       <section className="settings-section">
-        <h2>Abholpersonen</h2>
-        <div className="people-list">
-          {data.people.map((p) => (
-            <span key={p} className="chip chip-removable">
-              {p}
-              <button aria-label={`${p} entfernen`} onClick={() => removePerson(p)}>
-                ×
-              </button>
-            </span>
+        <h2>Ferien (keine Schule)</h2>
+        <ul className="kid-schedule-summary">
+          {HOLIDAYS.map((h) => (
+            <li key={h.label}>
+              {h.label}: {formatHolidayDate(h.start)} – {formatHolidayDate(h.end)}
+            </li>
           ))}
-        </div>
-        <div className="add-person-row">
-          <input
-            type="text"
-            placeholder="Name hinzufügen"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && addPerson()}
-          />
-          <button className="btn-small btn-primary" onClick={addPerson}>
-            Hinzufügen
-          </button>
-        </div>
+        </ul>
       </section>
 
       <section className="settings-section">
@@ -66,17 +37,6 @@ export default function SettingsView({ data, store, synced }) {
             einzurichten.
           </p>
         )}
-      </section>
-
-      <section className="settings-section">
-        <h2>Ferien (keine Schule)</h2>
-        <ul className="kid-schedule-summary">
-          {HOLIDAYS.map((h) => (
-            <li key={h.label}>
-              {h.label}: {formatHolidayDate(h.start)} – {formatHolidayDate(h.end)}
-            </li>
-          ))}
-        </ul>
       </section>
     </div>
   )

@@ -29,7 +29,7 @@ export default function App() {
       <main className="app-content">
         {tab === 'today' && <TodayView data={data} store={store} />}
         {tab === 'week' && <WeekView data={data} store={store} />}
-        {tab === 'settings' && <SettingsView data={data} store={store} synced={synced} />}
+        {tab === 'settings' && <SettingsView synced={synced} />}
       </main>
 
       <nav className="tab-bar">
