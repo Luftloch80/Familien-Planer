@@ -659,8 +659,12 @@
   background: rgba(var(--accent-rgb), 0.04);
 }
 
-.calendar-cell-flight {
-  background: var(--flight-bg);
+.calendar-cell-home {
+  background: var(--home-bg);
+}
+
+.calendar-cell-early {
+  background: var(--early-bg);
 }
 
 .calendar-cell-today {
