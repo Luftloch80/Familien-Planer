@@ -1,0 +1,407 @@
+.app-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100svh;
+  color: var(--text-muted);
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+}
+
+.app-content {
+  flex: 1;
+  padding: 20px 16px 96px;
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.view-header {
+  margin-bottom: 16px;
+}
+
+.view-header h1 {
+  font-size: 26px;
+  margin: 0 0 2px;
+  letter-spacing: -0.3px;
+}
+
+.subtitle {
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.hint {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--accent);
+}
+
+.week-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
+  color: var(--text);
+}
+
+/* Tab bar */
+.tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+  gap: 4px;
+}
+
+.tab-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  padding: 6px 4px;
+  border-radius: 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.tab-btn-active {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.tab-icon {
+  font-size: 20px;
+}
+
+/* Kid day card */
+.kid-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--kid-color, var(--accent));
+  border-radius: 12px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.kid-card-summary {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: none;
+  padding: 12px 14px;
+  text-align: left;
+  color: var(--text);
+}
+
+.kid-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--kid-color, var(--accent));
+  flex-shrink: 0;
+}
+
+.kid-name {
+  font-weight: 600;
+  flex: 0 0 auto;
+  min-width: 5.5em;
+}
+
+.kid-time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.badge {
+  font-size: 10px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.kid-label {
+  color: var(--text-muted);
+  font-size: 13px;
+  flex: 1;
+}
+
+.kid-person {
+  font-size: 13px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  padding: 3px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.kid-person-empty {
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px dashed var(--border);
+}
+
+.chevron {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.kid-card-detail {
+  padding: 4px 14px 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+}
+
+.field-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.option-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.chip-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.chip-removable {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg);
+}
+
+.chip-removable button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1;
+  padding: 0;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 13px;
+  padding: 4px 0;
+  text-align: left;
+}
+
+.link-button.danger {
+  color: var(--danger);
+}
+
+.exception-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+.exception-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.exception-editor input[type='time'] {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.exception-editor input[type='text'] {
+  flex: 1;
+  min-width: 140px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.exception-editor-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-small {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+}
+
+/* Today view */
+.today-list {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Week view */
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(220px, 1fr));
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+@media (max-width: 760px) {
+  .week-grid {
+    grid-template-columns: 1fr;
+    overflow-x: visible;
+  }
+}
+
+.day-column {
+  min-width: 0;
+}
+
+.day-heading {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+  padding: 6px 4px;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.day-heading.is-today {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.day-date {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Settings view */
+.settings-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.settings-section h2 {
+  margin: 0 0 10px;
+  font-size: 16px;
+}
+
+.people-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.add-person-row {
+  display: flex;
+  gap: 8px;
+}
+
+.add-person-row input {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.status-ok {
+  color: var(--ok);
+  margin: 0;
+}
+
+.status-warn {
+  color: var(--text-muted);
+  margin: 0;
+  font-size: 14px;
+}
+
+.kid-schedule-summary {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+}
