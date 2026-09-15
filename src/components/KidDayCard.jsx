@@ -1,183 +1,103 @@
-import { useState } from 'react'
 import { toISODate } from '../lib/dates.js'
 import { resolvePickup } from '../lib/pickup.js'
 import { EXCUSE_URL, FOOD_ORDER_URL } from '../data/kids.js'
 
-export default function KidDayCard({ kid, date, data, store, compact = false, sameTime = null }) {
-  const [open, setOpen] = useState(false)
+function nextPerson(current, people) {
+  if (!current) return people[0] ?? null
+  const idx = people.indexOf(current)
+  if (idx === -1 || idx === people.length - 1) return null
+  return people[idx + 1]
+}
+
+export default function KidDayCard({ kid, date, data, store, sameTime = null }) {
   const result = resolvePickup(kid, date, data)
   const dateISO = toISODate(date)
 
   if (!result) return null
 
-  const { options, chosenKey, time, label, person, exception } = result
+  const { options, chosenKey, time, person, exception } = result
   const timeClass = sameTime === true ? 'kid-time-same' : sameTime === false ? 'kid-time-diff' : ''
   const pin = data.credentials?.[kid.id]?.password
+  const regularOpt = options.find((o) => o.key === 'regular')
+  const kernzeitOpt = options.find((o) => o.key === 'kernzeit')
+
+  function chooseOption(key) {
+    store.setAssignment(dateISO, kid.id, {
+      ...(data.assignments[`${dateISO}|${kid.id}`] ?? {}),
+      option: key,
+    })
+  }
+
+  function cyclePerson() {
+    store.setAssignment(dateISO, kid.id, {
+      ...(data.assignments[`${dateISO}|${kid.id}`] ?? {}),
+      person: nextPerson(person, data.people),
+    })
+  }
 
   return (
     <div className="kid-card" style={{ '--kid-color': kid.color }}>
-      <div
-        className="kid-card-summary"
-        role="button"
-        tabIndex={0}
-        onClick={() => setOpen((o) => !o)}
-        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setOpen((o) => !o)}
-      >
-        <div className="kid-summary-row">
-          <span className="kid-dot" />
-          <span className="kid-name">{kid.name}</span>
-          <span className="kid-label">{label}</span>
-          <span className={`kid-time ${timeClass}`}>
+      <div className="kid-grid">
+        <div className="kid-col kid-col-name">
+          <div className="kid-name-row">
+            <span className="kid-dot" />
+            <span className="kid-name">{kid.name}</span>
+          </div>
+          <div className="kid-icons-row">
+            <a
+              className="icon-btn"
+              href={FOOD_ORDER_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Essen bestellen"
+            >
+              🍽️
+            </a>
+            <a
+              className="icon-btn"
+              href={EXCUSE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Krankmeldung"
+            >
+              🤒{pin && <span className="icon-btn-pin">{pin}</span>}
+            </a>
+          </div>
+        </div>
+
+        <div className="kid-col kid-col-options">
+          {regularOpt && (
+            <button
+              className={`kid-option-row ${chosenKey === 'regular' ? 'kid-option-active' : ''}`}
+              onClick={() => chooseOption('regular')}
+            >
+              <span>Schulschluss</span>
+              <span className="kid-option-time">{regularOpt.time}</span>
+            </button>
+          )}
+          {kernzeitOpt && (
+            <button
+              className={`kid-option-row ${chosenKey === 'kernzeit' ? 'kid-option-active' : ''}`}
+              onClick={() => chooseOption('kernzeit')}
+            >
+              <span>Kernzeit</span>
+              <span className="kid-option-time">{kernzeitOpt.time}</span>
+            </button>
+          )}
+        </div>
+
+        <div className="kid-col kid-col-result">
+          <div className={`kid-result-time ${timeClass}`}>
             {time ?? '–'}
             {exception?.time && <span className="badge">Ausnahme</span>}
-          </span>
-        </div>
-        <div className="kid-summary-row">
-          <a
-            className="icon-btn"
-            href={FOOD_ORDER_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Essen bestellen"
-            onClick={(e) => e.stopPropagation()}
-          >
-            🍽️
-          </a>
-          <a
-            className="icon-btn"
-            href={EXCUSE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Krankmeldung"
-            onClick={(e) => e.stopPropagation()}
-          >
-            🤒{pin && <span className="icon-btn-pin">{pin}</span>}
-          </a>
-          <span className={`kid-person ${person ? '' : 'kid-person-empty'}`}>
-            {person ?? 'wer holt ab?'}
-          </span>
-          <span className="chevron">{open ? '▲' : '▼'}</span>
-        </div>
-      </div>
-
-      {open && !compact && (
-        <div className="kid-card-detail">
-          <div className="field-row">
-            <span className="field-label">Abholung</span>
-            <div className="option-chips">
-              {options.map((opt) => (
-                <button
-                  key={opt.key}
-                  className={`chip ${chosenKey === opt.key ? 'chip-active' : ''}`}
-                  onClick={() =>
-                    store.setAssignment(dateISO, kid.id, {
-                      ...(data.assignments[`${dateISO}|${kid.id}`] ?? {}),
-                      option: opt.key,
-                    })
-                  }
-                >
-                  {opt.label} {opt.time}
-                </button>
-              ))}
-            </div>
           </div>
-
-          <div className="field-row">
-            <span className="field-label">Wer holt ab</span>
-            <div className="option-chips">
-              {data.people.map((p) => (
-                <button
-                  key={p}
-                  className={`chip ${person === p ? 'chip-active' : ''}`}
-                  onClick={() =>
-                    store.setAssignment(dateISO, kid.id, {
-                      ...(data.assignments[`${dateISO}|${kid.id}`] ?? {}),
-                      person: person === p ? null : p,
-                    })
-                  }
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <ExceptionEditor
-            dateISO={dateISO}
-            kidId={kid.id}
-            exception={exception}
-            store={store}
-          />
+          <button
+            className={`kid-person-btn ${person ? '' : 'kid-person-empty'}`}
+            onClick={cyclePerson}
+          >
+            {person ?? 'wer holt?'}
+          </button>
         </div>
-      )}
-    </div>
-  )
-}
-
-function ExceptionEditor({ dateISO, kidId, exception, store }) {
-  const [editing, setEditing] = useState(false)
-  const [time, setTime] = useState(exception?.time ?? '')
-  const [note, setNote] = useState(exception?.note ?? '')
-
-  if (!editing && !exception) {
-    return (
-      <button className="link-button" onClick={() => setEditing(true)}>
-        + Ausnahme für diesen Tag eintragen
-      </button>
-    )
-  }
-
-  if (!editing && exception) {
-    return (
-      <div className="exception-summary">
-        <span>
-          Ausnahme: {exception.time} {exception.note && `– ${exception.note}`}
-        </span>
-        <button
-          className="link-button"
-          onClick={() => {
-            setTime(exception.time ?? '')
-            setNote(exception.note ?? '')
-            setEditing(true)
-          }}
-        >
-          bearbeiten
-        </button>
-        <button className="link-button danger" onClick={() => store.clearException(dateISO, kidId)}>
-          entfernen
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="exception-editor">
-      <input
-        type="time"
-        value={time}
-        onChange={(e) => setTime(e.target.value)}
-        aria-label="Abweichende Abholzeit"
-      />
-      <input
-        type="text"
-        placeholder="Notiz (z.B. Zahnarzt, AG fällt aus)"
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-      />
-      <div className="exception-editor-actions">
-        <button
-          className="btn-small btn-primary"
-          disabled={!time}
-          onClick={() => {
-            store.setException(dateISO, kidId, { time, note })
-            setEditing(false)
-          }}
-        >
-          Speichern
-        </button>
-        <button className="btn-small" onClick={() => setEditing(false)}>
-          Abbrechen
-        </button>
       </div>
     </div>
   )
