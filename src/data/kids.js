@@ -131,6 +131,6 @@ export function pickupOptions(kid, weekday, date) {
     options.push({ key: 'regular', label: 'Schulschluss', time: day.regular })
   }
 
-  if (kid.kernzeit) options.push({ key: 'kernzeit', label: 'Kernzeit Abholung', time: kid.kernzeit })
+  if (kid.kernzeit) options.push({ key: 'kernzeit', label: 'Kernzeit', time: kid.kernzeit })
   return options.sort((a, b) => a.time.localeCompare(b.time))
 }
