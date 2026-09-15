@@ -26,6 +26,13 @@ export default function KidDayCard({ kid, date, data, store, compact = false, sa
         <div className="kid-summary-row">
           <span className="kid-dot" />
           <span className="kid-name">{kid.name}</span>
+          <span className="kid-label">{label}</span>
+          <span className={`kid-time ${timeClass}`}>
+            {time ?? '–'}
+            {exception?.time && <span className="badge">Ausnahme</span>}
+          </span>
+        </div>
+        <div className="kid-summary-row">
           <a
             className="icon-btn"
             href={FOOD_ORDER_URL}
@@ -46,13 +53,6 @@ export default function KidDayCard({ kid, date, data, store, compact = false, sa
           >
             🤒{pin && <span className="icon-btn-pin">{pin}</span>}
           </a>
-          <span className={`kid-time ${timeClass}`}>
-            {time ?? '–'}
-            {exception?.time && <span className="badge">Ausnahme</span>}
-          </span>
-        </div>
-        <div className="kid-summary-row">
-          <span className="kid-label">{label}</span>
           <span className={`kid-person ${person ? '' : 'kid-person-empty'}`}>
             {person ?? 'wer holt ab?'}
           </span>

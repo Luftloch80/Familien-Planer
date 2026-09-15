@@ -203,7 +203,7 @@
 
 .kid-name {
   font-weight: 600;
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -234,7 +234,6 @@
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  margin-left: auto;
 }
 
 .kid-time-same {
@@ -257,10 +256,7 @@
 .kid-label {
   color: var(--text-muted);
   font-size: 13px;
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex-shrink: 0;
   white-space: nowrap;
 }
 
@@ -275,6 +271,7 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  margin-left: auto;
 }
 
 .kid-person-empty {
