@@ -35,6 +35,11 @@ export default function SettingsView({ data, store, synced, onOpenMonthOverview 
       </section>
 
       <section className="settings-section">
+        <h2>Einmalige Termine</h2>
+        <OneOffEvents data={data} store={store} />
+      </section>
+
+      <section className="settings-section">
         <h2>Monatsübersicht</h2>
         <p className="status-warn">
           Alle Abholzeiten und wiederkehrenden Termine eines Monats als PDF (Querformat).
@@ -130,6 +135,133 @@ function RecurringEventsForKid({ kid, data, store }) {
           + Termin hinzufügen
         </button>
       )}
+    </div>
+  )
+}
+
+function formatDateDMY(iso) {
+  const [y, m, d] = iso.split('-')
+  return `${d}.${m}.${y}`
+}
+
+function OneOffEvents({ data, store }) {
+  const [adding, setAdding] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+
+  const events = Object.entries(data.oneOffEvents ?? {}).sort(
+    (a, b) => a[1].date.localeCompare(b[1].date) || a[1].time.localeCompare(b[1].time),
+  )
+
+  function kidOf(id) {
+    return KIDS.find((k) => k.id === id)
+  }
+
+  return (
+    <div className="recurring-kid-block">
+      {events.length > 0 && (
+        <ul className="kid-schedule-summary recurring-list">
+          {events.map(([id, ev]) =>
+            editingId === id ? (
+              <li key={id}>
+                <OneOffEventForm
+                  initial={ev}
+                  submitLabel="Speichern"
+                  onSubmit={(value) => {
+                    store.setOneOffEvent(id, value)
+                    setEditingId(null)
+                  }}
+                  onCancel={() => setEditingId(null)}
+                />
+              </li>
+            ) : (
+              <li key={id} className="recurring-item">
+                <span>
+                  <strong style={{ color: kidOf(ev.kidId)?.color }}>{kidOf(ev.kidId)?.name}</strong>{' '}
+                  {formatDateDMY(ev.date)} {ev.time} – {ev.reason}
+                </span>
+                <span className="recurring-item-actions">
+                  <button
+                    className="link-button"
+                    aria-label={`${ev.reason} bearbeiten`}
+                    onClick={() => setEditingId(id)}
+                  >
+                    ✎
+                  </button>
+                  <button
+                    className="link-button danger"
+                    aria-label={`${ev.reason} entfernen`}
+                    onClick={() => store.removeOneOffEvent(id)}
+                  >
+                    ×
+                  </button>
+                </span>
+              </li>
+            ),
+          )}
+        </ul>
+      )}
+
+      {adding ? (
+        <OneOffEventForm
+          initial={{ kidId: KIDS[0].id, date: '', time: '16:00', reason: '' }}
+          submitLabel="Hinzufügen"
+          onSubmit={(value) => {
+            store.addOneOffEvent(value)
+            setAdding(false)
+          }}
+          onCancel={() => setAdding(false)}
+        />
+      ) : (
+        <button className="link-button" onClick={() => setAdding(true)}>
+          + Termin hinzufügen
+        </button>
+      )}
+    </div>
+  )
+}
+
+function OneOffEventForm({ initial, submitLabel, onSubmit, onCancel }) {
+  const [kidId, setKidId] = useState(initial.kidId)
+  const [date, setDate] = useState(initial.date)
+  const [time, setTime] = useState(initial.time)
+  const [reason, setReason] = useState(initial.reason)
+
+  function submit() {
+    const trimmed = reason.trim()
+    if (!trimmed || !date || !time) return
+    onSubmit({ kidId, date, time, reason: trimmed })
+  }
+
+  return (
+    <div className="add-event-form">
+      <div className="add-person-row">
+        <select value={kidId} onChange={(e) => setKidId(e.target.value)}>
+          {KIDS.map((k) => (
+            <option key={k.id} value={k.id}>
+              {k.name}
+            </option>
+          ))}
+        </select>
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+      </div>
+      <div className="add-person-row">
+        <TimeSelect value={time} onChange={setTime} />
+        <input
+          type="text"
+          placeholder="Grund (z.B. Zahnarzt)"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && submit()}
+        />
+      </div>
+      <div className="add-person-row">
+        <button className="btn-small btn-primary" onClick={submit}>
+          {submitLabel}
+        </button>
+        <button className="btn-small" onClick={onCancel}>
+          Abbrechen
+        </button>
+      </div>
     </div>
   )
 }

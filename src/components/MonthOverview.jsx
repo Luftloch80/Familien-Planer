@@ -15,16 +15,27 @@ function buildRows(days, kids, data) {
     const weekday = weekdayName(date)
     const holiday = holidayLabel(date)
     const school = isSchoolDay(date)
+    const dateISO = toISODate(date)
     const dateLabel = `${date.toLocaleDateString('de-DE', { weekday: 'short' })} ${date.getDate()}.`
     const cells = kids.map((kid) => {
-      if (!weekday) return { lines: [], holiday: null }
-      if (!school) return { lines: [], holiday: holiday ?? 'frei' }
+      const oneOff = Object.values(data.oneOffEvents ?? {}).filter(
+        (ev) => ev.kidId === kid.id && ev.date === dateISO,
+      )
+      const oneOffLines = oneOff.map((e) => `${e.reason} ${e.time}`)
+
+      if (!weekday) return { lines: oneOffLines, holiday: null }
+      if (!school) return { lines: oneOffLines, holiday: holiday ?? 'frei' }
+
       const options = pickupOptions(kid, weekday, date)
-      const events = Object.values(data.recurringEvents?.[kid.id] ?? {}).filter(
+      const recurring = Object.values(data.recurringEvents?.[kid.id] ?? {}).filter(
         (ev) => ev.weekday === weekday,
       )
       return {
-        lines: [...options.map((o) => `${o.label} ${o.time}`), ...events.map((e) => `${e.title} ${e.time}`)],
+        lines: [
+          ...options.map((o) => `${o.label} ${o.time}`),
+          ...recurring.map((e) => `${e.title} ${e.time}`),
+          ...oneOffLines,
+        ],
         holiday: null,
       }
     })
@@ -91,7 +102,7 @@ export default function MonthOverview({ data, onClose }) {
         head: [['Datum', ...kids.map((k) => k.name)]],
         body: rows.map((r) => [
           r.dateLabel,
-          ...r.cells.map((c) => c.holiday ?? c.lines.join('\n')),
+          ...r.cells.map((c) => [c.holiday, ...c.lines].filter(Boolean).join('\n')),
         ]),
         styles: { fontSize: 7, cellPadding: 1.2, valign: 'top' },
         headStyles: { fillColor: [106, 90, 205] },
@@ -157,12 +168,11 @@ export default function MonthOverview({ data, onClose }) {
             <tr key={toISODate(days[i])} className={row.isWeekend ? 'month-row-weekend' : ''}>
               <td className="month-date-cell">{row.dateLabel}</td>
               {row.cells.map((cell, j) => (
-                <td key={kids[j].id} className={cell.holiday ? 'month-holiday-cell' : ''}>
-                  {cell.holiday ? (
-                    cell.holiday
-                  ) : (
-                    cell.lines.map((line, k) => <div key={k}>{line}</div>)
-                  )}
+                <td key={kids[j].id}>
+                  {cell.holiday && <span className="month-holiday-cell">{cell.holiday}</span>}
+                  {cell.lines.map((line, k) => (
+                    <div key={k}>{line}</div>
+                  ))}
                 </td>
               ))}
             </tr>

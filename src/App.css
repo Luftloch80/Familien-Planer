@@ -588,6 +588,7 @@
 }
 
 .month-holiday-cell {
+  display: block;
   color: var(--text-muted);
   font-style: italic;
 }

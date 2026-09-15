@@ -9,6 +9,7 @@ const DEFAULT_DATA = {
   exceptions: {},
   credentials: {},
   recurringEvents: {},
+  oneOffEvents: {},
 }
 
 function readLocal() {
@@ -212,6 +213,40 @@ export function useFamilyStore() {
     [updateLocalAndMaybeRemote],
   )
 
+  const setOneOffEvent = useCallback(
+    (id, event) => {
+      updateLocalAndMaybeRemote(
+        (prev) => ({ ...prev, oneOffEvents: { ...prev.oneOffEvents, [id]: event } }),
+        `oneOffEvents.${id}`,
+        event,
+      )
+    },
+    [updateLocalAndMaybeRemote],
+  )
+
+  const addOneOffEvent = useCallback(
+    (event) => {
+      const id = `${Date.now()}${Math.random().toString(36).slice(2, 8)}`
+      setOneOffEvent(id, event)
+    },
+    [setOneOffEvent],
+  )
+
+  const removeOneOffEvent = useCallback(
+    (id) => {
+      updateLocalAndMaybeRemote(
+        (prev) => {
+          const next = { ...prev.oneOffEvents }
+          delete next[id]
+          return { ...prev, oneOffEvents: next }
+        },
+        `oneOffEvents.${id}`,
+        null,
+      )
+    },
+    [updateLocalAndMaybeRemote],
+  )
+
   return {
     data: data ?? DEFAULT_DATA,
     ready,
@@ -225,5 +260,8 @@ export function useFamilyStore() {
     addRecurringEvent,
     setRecurringEvent,
     removeRecurringEvent,
+    addOneOffEvent,
+    setOneOffEvent,
+    removeOneOffEvent,
   }
 }
