@@ -39,10 +39,14 @@ export function useFamilyStore() {
     const unsub = onSnapshot(
       familyDocRef,
       (snap) => {
+        // Nie ungefragt das ganze Dokument (neu) anlegen: ein leerer/fehlender
+        // Snapshot kann auch nur eine leere Offline-Cache-Ansicht sein, obwohl
+        // auf dem Server längst echte Daten liegen. Ein setDoc(DEFAULT_DATA)
+        // hier hat genau das schon mehrfach gelöscht. Anlegen passiert nur
+        // noch gezielt über persistField, wenn tatsächlich etwas gespeichert wird.
         if (snap.exists()) {
           setData({ ...DEFAULT_DATA, ...snap.data() })
         } else {
-          setDoc(familyDocRef, DEFAULT_DATA).catch(() => {})
           setData(DEFAULT_DATA)
         }
         setReady(true)
@@ -61,9 +65,23 @@ export function useFamilyStore() {
       try {
         await updateDoc(familyDocRef, { [path]: value })
       } catch {
-        // Netzwerk-/Verbindungsproblem: nicht auf das ganze Dokument zurückfallen,
-        // das würde andere Felder (z.B. credentials) überschreiben. Lokaler Stand
-        // bleibt erhalten, der nächste erfolgreiche Schreibvorgang holt es nach.
+        // updateDoc schlägt fehl, wenn das Dokument noch gar nicht existiert.
+        // setDoc mit mergeFields schreibt garantiert NUR dieses eine Feld -
+        // egal ob das Dokument neu angelegt oder schon voller anderer Daten
+        // ist, nichts anderes wird angefasst oder überschrieben.
+        const nested = {}
+        const parts = path.split('.')
+        let cur = nested
+        for (let i = 0; i < parts.length - 1; i++) {
+          cur[parts[i]] = {}
+          cur = cur[parts[i]]
+        }
+        cur[parts[parts.length - 1]] = value
+        try {
+          await setDoc(familyDocRef, nested, { mergeFields: [path] })
+        } catch {
+          // weiterhin offline: lokaler Stand bleibt, nächster Schreibversuch holt es nach
+        }
       }
     }
   }, [])
