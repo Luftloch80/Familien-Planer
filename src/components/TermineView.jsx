@@ -38,7 +38,6 @@ export default function TermineView({ data, store }) {
       ))}
 
       <section className="settings-section">
-        <h2>Aktueller KW Block</h2>
         <KwBlockOverview data={data} />
       </section>
 

@@ -108,7 +108,7 @@ export default function KwBlockOverview({ data }) {
       const pageWidth = doc.internal.pageSize.getWidth()
       const pageHeight = doc.internal.pageSize.getHeight()
       doc.setFontSize(14)
-      doc.text(weekRangeLabel, pageWidth / 2, 12, { align: 'center' })
+      doc.text(`${weekRangeLabel} (${rangeLabel})`, pageWidth / 2, 12, { align: 'center' })
 
       // Immer genau 4 Blöcke à 7 Tage, da `days` schon exakt 4 volle Wochen ist.
       const blocks = [0, 1, 2, 3].map((i) => ({
@@ -198,6 +198,10 @@ export default function KwBlockOverview({ data }) {
 
   return (
     <>
+      <h2>
+        {weekRangeLabel} ({rangeLabel})
+      </h2>
+
       <div className="kw-block-kid-picker">
         {KIDS.map((kid) => (
           <label key={kid.id} className="kw-block-kid-checkbox">
@@ -216,7 +220,7 @@ export default function KwBlockOverview({ data }) {
       </div>
 
       <button className="btn-small btn-primary" onClick={showPdf} disabled={generating}>
-        {generating ? 'Erstelle PDF…' : `PDF erstellen · ${weekRangeLabel} (${rangeLabel})`}
+        {generating ? 'Erstelle PDF…' : 'PDF erstellen'}
       </button>
     </>
   )
