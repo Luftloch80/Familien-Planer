@@ -30,7 +30,7 @@ function buildRows(days, kids, data) {
     const holiday = holidayLabel(date)
     const school = isSchoolDay(date)
     const dateISO = toISODate(date)
-    const dateLabel = `${date.toLocaleDateString('de-DE', { weekday: 'short' })} ${date.getDate()}.`
+    const dateLabel = `${date.toLocaleDateString('de-DE', { weekday: 'short' })} ${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.`
     const cells = kids.map((kid) => {
       // Mehrtägige Termine (date...endDate) erscheinen an jedem Tag im Zeitraum.
       // Termine ganz ohne Datum lassen sich keinem Tag zuordnen und fehlen hier.
