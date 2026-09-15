@@ -78,7 +78,7 @@ function capLines(lines) {
   return shown.join('\n')
 }
 
-export default function MonthOverview({ data }) {
+export default function KwBlockOverview({ data }) {
   // Kein Monatsbezug und keine Navigation: immer genau die 4 vollen
   // Kalenderwochen (Mo-So), die die aktuelle Woche enthalten.
   const anchorMonday = startOfWeek(new Date())
@@ -105,8 +105,10 @@ export default function MonthOverview({ data }) {
       const { jsPDF } = await import('jspdf')
       const autoTable = (await import('jspdf-autotable')).default
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const pageHeight = doc.internal.pageSize.getHeight()
       doc.setFontSize(14)
-      doc.text(`Aktueller KW Block · ${rangeLabel}`, 148, 12, { align: 'center' })
+      doc.text(`Aktueller KW Block · ${rangeLabel}`, pageWidth / 2, 12, { align: 'center' })
 
       // Immer genau 4 Blöcke à 7 Tage, da `days` schon exakt 4 volle Wochen ist.
       const blocks = [0, 1, 2, 3].map((i) => ({
@@ -118,8 +120,8 @@ export default function MonthOverview({ data }) {
       const gutter = 6
       const marginLeft = 8
       const marginTop = 18
-      const usableWidth = doc.internal.pageSize.getWidth() - marginLeft * 2
-      const usableHeight = doc.internal.pageSize.getHeight() - marginTop - 6
+      const usableWidth = pageWidth - marginLeft * 2
+      const usableHeight = pageHeight - marginTop - 6
       const blockWidth = (usableWidth - gutter * (cols - 1)) / cols
       const blockHeight = (usableHeight - gutter) / 2
 
@@ -150,8 +152,8 @@ export default function MonthOverview({ data }) {
           startY: y,
           margin: {
             left: x,
-            right: doc.internal.pageSize.getWidth() - x - blockWidth,
-            bottom: doc.internal.pageSize.getHeight() - (y + blockHeight),
+            right: pageWidth - x - blockWidth,
+            bottom: pageHeight - (y + blockHeight),
           },
           tableWidth: blockWidth,
           head: [['Datum', ...kids.map((k) => k.name), ...(showDuty ? ['Dienst'] : [])]],
@@ -196,9 +198,9 @@ export default function MonthOverview({ data }) {
 
   return (
     <>
-      <div className="month-kid-picker">
+      <div className="kw-block-kid-picker">
         {KIDS.map((kid) => (
-          <label key={kid.id} className="month-kid-checkbox">
+          <label key={kid.id} className="kw-block-kid-checkbox">
             <input
               type="checkbox"
               checked={selectedKidIds.includes(kid.id)}
@@ -207,7 +209,7 @@ export default function MonthOverview({ data }) {
             <span style={{ color: kid.color }}>{kid.name}</span>
           </label>
         ))}
-        <label className="month-kid-checkbox">
+        <label className="kw-block-kid-checkbox">
           <input type="checkbox" checked={showDuty} onChange={() => setShowDuty((s) => !s)} />
           <span>Dienstplan</span>
         </label>

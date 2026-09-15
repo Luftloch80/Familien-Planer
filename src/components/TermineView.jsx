@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { HOLIDAYS } from '../lib/holidays.js'
 import { KIDS, WEEKDAYS } from '../data/kids.js'
 import TimeSelect from './TimeSelect.jsx'
-import MonthOverview from './MonthOverview.jsx'
+import KwBlockOverview from './KwBlockOverview.jsx'
 
 function formatHolidayDate(iso) {
   const [y, m, d] = iso.split('-')
@@ -39,7 +39,7 @@ export default function TermineView({ data, store }) {
 
       <section className="settings-section">
         <h2>Aktueller KW Block</h2>
-        <MonthOverview data={data} />
+        <KwBlockOverview data={data} />
       </section>
 
       <section className="settings-section">

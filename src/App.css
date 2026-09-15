@@ -498,7 +498,7 @@
   font-size: 14px;
 }
 
-.month-kid-picker {
+.kw-block-kid-picker {
   display: flex;
   gap: 14px;
   flex-wrap: wrap;
@@ -509,7 +509,7 @@
   background: var(--surface);
 }
 
-.month-kid-checkbox {
+.kw-block-kid-checkbox {
   display: flex;
   align-items: center;
   gap: 6px;
