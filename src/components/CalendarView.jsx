@@ -74,7 +74,6 @@ export default function CalendarView({ data }) {
 
   const selectedDate = days.find((d) => toISODate(d) === selectedISO) ?? null
   const selectedInfo = selectedDate ? dayInfo(selectedDate, data) : null
-  const selectedIsFlightDay = selectedInfo && (data.flightDates ?? []).includes(selectedInfo.dateISO)
   const selectedIsEarly = selectedInfo && (data.earlyCheckinDates ?? []).includes(selectedInfo.dateISO)
   const selectedIsAway = selectedInfo && (data.awayDates ?? []).includes(selectedInfo.dateISO)
 
@@ -157,10 +156,8 @@ export default function CalendarView({ data }) {
             </p>
           )}
 
-          {selectedIsFlightDay && <p className="status-warn">✈️ Flugtag</p>}
           {selectedIsAway && <p className="status-warn">🧳 Unterwegs</p>}
           {selectedIsEarly && <p className="status-warn">🟠 Früher Check-in am nächsten Tag (vor 09:00)</p>}
-          {!selectedIsFlightDay && !selectedIsAway && !selectedIsEarly && <p className="status-warn">🏠 Zu Hause</p>}
 
           {selectedInfo.perKid.every((p) => !p.pickup && p.recurring.length === 0 && p.oneOff.length === 0) ? (
             <p className="status-warn">Keine Termine an diesem Tag.</p>
