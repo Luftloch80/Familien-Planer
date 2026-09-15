@@ -672,9 +672,8 @@
 }
 
 .calendar-cell-selected {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-contrast);
+  border: 2px solid var(--accent);
+  font-weight: 700;
 }
 
 .calendar-cell-num {
