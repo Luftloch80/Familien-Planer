@@ -38,7 +38,7 @@ export default function TermineView({ data, store }) {
       ))}
 
       <section className="settings-section">
-        <h2>Monatsübersicht</h2>
+        <h2>Aktueller KW Block</h2>
         <MonthOverview data={data} />
       </section>
 

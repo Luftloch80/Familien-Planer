@@ -1,11 +1,7 @@
 import { useState } from 'react'
 import { KIDS, pickupOptions } from '../data/kids.js'
-import { weekdayName, toISODate } from '../lib/dates.js'
+import { weekdayName, toISODate, startOfWeek, addDays } from '../lib/dates.js'
 import { isSchoolDay, holidayLabel } from '../lib/holidays.js'
-
-function daysInMonth(year, monthIndex) {
-  return new Date(year, monthIndex + 1, 0).getDate()
-}
 
 // Baut aus Titel + optionaler Start-/Enduhrzeit eine Anzeigezeile, z.B.
 // "Zahnarzt 14:00–15:00", "Zahnarzt 14:00" oder nur "Zahnarzt" ohne Uhrzeit.
@@ -26,9 +22,8 @@ function dutyLabel(dateISO, data) {
   return 'Frei'
 }
 
-// Baut für jeden Tag des Monats eine Zeile: Datumsbezeichnung + pro Kind
-// entweder "frei"/Ferien-Label oder die Abhol-Optionen + passende Termine.
-// Wird sowohl für die Bildschirm-Tabelle als auch für den PDF-Export genutzt.
+// Baut für jeden Tag eine Zeile: Datumsbezeichnung + pro Kind entweder
+// "frei"/Ferien-Label oder die Abhol-Optionen + passende Termine.
 function buildRows(days, kids, data) {
   return days.map((date) => {
     const weekday = weekdayName(date)
@@ -64,26 +59,36 @@ function buildRows(days, kids, data) {
   })
 }
 
+function isoWeekNumber(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dayNum = (d.getUTCDay() + 6) % 7
+  d.setUTCDate(d.getUTCDate() - dayNum + 3)
+  const firstThursday = new Date(Date.UTC(d.getUTCFullYear(), 0, 4))
+  const firstThursdayDayNum = (firstThursday.getUTCDay() + 6) % 7
+  firstThursday.setUTCDate(firstThursday.getUTCDate() - firstThursdayDayNum + 3)
+  return 1 + Math.round((d - firstThursday) / (7 * 86400000))
+}
+
+// Höchstens 3 Zeilen pro Zelle, sonst "+N weitere" - so bleibt die
+// Zeilenhöhe vorhersehbar und die 4 Blöcke sprengen die Seite nicht.
+function capLines(lines) {
+  if (lines.length <= 3) return lines.join('\n')
+  const shown = lines.slice(0, 2)
+  shown.push(`+${lines.length - 2} weitere`)
+  return shown.join('\n')
+}
+
 export default function MonthOverview({ data }) {
-  const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
-  const [monthIndex, setMonthIndex] = useState(now.getMonth())
+  // Kein Monatsbezug mehr: immer genau 4 volle Kalenderwochen (Mo-So) ab
+  // einem verschiebbaren Anker, der standardmäßig bei der aktuellen Woche
+  // startet - "Aktueller KW Block".
+  const [anchorMonday, setAnchorMonday] = useState(() => startOfWeek(new Date()))
   const [selectedKidIds, setSelectedKidIds] = useState(() => KIDS.map((k) => k.id))
   const [showDuty, setShowDuty] = useState(true)
   const [generating, setGenerating] = useState(false)
 
-  function changeMonth(delta) {
-    let m = monthIndex + delta
-    let y = year
-    if (m < 0) {
-      m = 11
-      y -= 1
-    } else if (m > 11) {
-      m = 0
-      y += 1
-    }
-    setMonthIndex(m)
-    setYear(y)
+  function changeBlock(delta) {
+    setAnchorMonday((prev) => addDays(prev, delta * 28))
   }
 
   function toggleKid(id) {
@@ -92,33 +97,11 @@ export default function MonthOverview({ data }) {
     )
   }
 
-  const monthLabel = new Date(year, monthIndex, 1).toLocaleDateString('de-DE', {
-    month: 'long',
-    year: 'numeric',
-  })
-
-  const days = Array.from({ length: daysInMonth(year, monthIndex) }, (_, i) => new Date(year, monthIndex, i + 1))
+  const days = Array.from({ length: 28 }, (_, i) => addDays(anchorMonday, i))
   const kids = KIDS.filter((k) => selectedKidIds.includes(k.id))
   const rows = buildRows(days, kids, data)
 
-  function isoWeekNumber(date) {
-    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-    const dayNum = (d.getUTCDay() + 6) % 7
-    d.setUTCDate(d.getUTCDate() - dayNum + 3)
-    const firstThursday = new Date(Date.UTC(d.getUTCFullYear(), 0, 4))
-    const firstThursdayDayNum = (firstThursday.getUTCDay() + 6) % 7
-    firstThursday.setUTCDate(firstThursday.getUTCDate() - firstThursdayDayNum + 3)
-    return 1 + Math.round((d - firstThursday) / (7 * 86400000))
-  }
-
-  // Höchstens 3 Zeilen pro Zelle, sonst "+N weitere" - so bleibt die
-  // Zeilenhöhe vorhersehbar und die 4 Blöcke sprengen die Seite nicht.
-  function capLines(lines) {
-    if (lines.length <= 3) return lines.join('\n')
-    const shown = lines.slice(0, 2)
-    shown.push(`+${lines.length - 2} weitere`)
-    return shown.join('\n')
-  }
+  const rangeLabel = `${days[0].toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} – ${days[27].toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}`
 
   async function showPdf() {
     setGenerating(true)
@@ -127,28 +110,21 @@ export default function MonthOverview({ data }) {
       const autoTable = (await import('jspdf-autotable')).default
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
       doc.setFontSize(14)
-      doc.text(`Monatsübersicht ${monthLabel}`, 148, 12, { align: 'center' })
+      doc.text(`Aktueller KW Block · ${rangeLabel}`, 148, 12, { align: 'center' })
 
-      // Immer genau 4 Blöcke, unabhängig davon ob der Monat 4, 5 oder 6
-      // echte Kalenderwochen umfasst - für ein gleichbleibendes 2x2-Raster.
-      const chunkSize = Math.ceil(days.length / 4)
-      const blocks = []
-      for (let i = 0; i < 4; i++) {
-        const startIdx = i * chunkSize
-        const blockRows = rows.slice(startIdx, startIdx + chunkSize)
-        if (blockRows.length === 0) continue
-        const firstDate = days[startIdx]
-        const lastDate = days[Math.min(startIdx + blockRows.length, days.length) - 1]
-        const rangeLabel = `${firstDate.getDate()}.–${lastDate.getDate()}.`
-        blocks.push({ weekNum: isoWeekNumber(firstDate), rangeLabel, rows: blockRows })
-      }
+      // Immer genau 4 Blöcke à 7 Tage, da `days` schon exakt 4 volle Wochen ist.
+      const blocks = [0, 1, 2, 3].map((i) => ({
+        weekNum: isoWeekNumber(days[i * 7]),
+        days: days.slice(i * 7, i * 7 + 7),
+        rows: rows.slice(i * 7, i * 7 + 7),
+      }))
 
       const cols = 2
-      const gutter = 8
-      const marginLeft = 10
-      const marginTop = 20
+      const gutter = 6
+      const marginLeft = 8
+      const marginTop = 18
       const usableWidth = doc.internal.pageSize.getWidth() - marginLeft * 2
-      const usableHeight = doc.internal.pageSize.getHeight() - marginTop - 10
+      const usableHeight = doc.internal.pageSize.getHeight() - marginTop - 6
       const blockWidth = (usableWidth - gutter * (cols - 1)) / cols
       const blockHeight = (usableHeight - gutter) / 2
 
@@ -158,18 +134,36 @@ export default function MonthOverview({ data }) {
       const columnStyles = {}
       for (let c = 0; c < totalCols; c++) columnStyles[c] = { cellWidth: equalColWidth }
 
+      // Feste, bereits erprobte Werte statt dynamischer Skalierung: bei größerer
+      // Schrift kann Text in den schmalen gleich breiten Spalten umbrechen und
+      // damit die für die Blockhöhe angenommene Zeilenzahl sprengen.
+      const headerHeight = 5
+      const bodyFontSize = 6
+      const bodyCellPadding = 0.8
+      const bodyRowHeight = ((blockHeight - headerHeight) / 7) * 0.85
+
       blocks.forEach((block, i) => {
         const col = i % cols
         const row = Math.floor(i / cols)
         const x = marginLeft + col * (blockWidth + gutter)
         const y = marginTop + row * (blockHeight + gutter)
+        const first = block.days[0]
+        const last = block.days[6]
+        const weekRangeLabel =
+          first.getMonth() === last.getMonth()
+            ? `${first.getDate()}.–${last.getDate()}.${last.getMonth() + 1}.`
+            : `${first.getDate()}.${first.getMonth() + 1}.–${last.getDate()}.${last.getMonth() + 1}.`
 
         doc.setFontSize(9)
-        doc.text(`KW ${block.weekNum} · ${block.rangeLabel}`, x, y - 2)
+        doc.text(`KW ${block.weekNum} · ${weekRangeLabel}`, x, y - 2)
 
         autoTable(doc, {
           startY: y,
-          margin: { left: x, right: doc.internal.pageSize.getWidth() - x - blockWidth },
+          margin: {
+            left: x,
+            right: doc.internal.pageSize.getWidth() - x - blockWidth,
+            bottom: doc.internal.pageSize.getHeight() - (y + blockHeight),
+          },
           tableWidth: blockWidth,
           head: [['Datum', ...kids.map((k) => k.name), ...(showDuty ? ['Dienst'] : [])]],
           body: block.rows.map((r) => [
@@ -179,19 +173,19 @@ export default function MonthOverview({ data }) {
           ]),
           theme: 'grid',
           styles: {
-            fontSize: 6,
-            cellPadding: 0.8,
+            fontSize: bodyFontSize,
+            cellPadding: bodyCellPadding,
             valign: 'top',
             lineWidth: 0.25,
             lineColor: [90, 90, 90],
-            minCellHeight: 9,
+            minCellHeight: bodyRowHeight,
           },
           headStyles: {
             fillColor: [106, 90, 205],
-            fontSize: 6,
+            fontSize: bodyFontSize,
             lineWidth: 0.25,
             lineColor: [90, 90, 90],
-            minCellHeight: 4.5,
+            minCellHeight: headerHeight,
           },
           columnStyles,
           didParseCell: (hookData) => {
@@ -212,11 +206,11 @@ export default function MonthOverview({ data }) {
   return (
     <>
       <div className="month-nav">
-        <button className="nav-btn" onClick={() => changeMonth(-1)} aria-label="Vorheriger Monat">
+        <button className="nav-btn" onClick={() => changeBlock(-1)} aria-label="Vorherige 4 Wochen">
           ‹
         </button>
-        <strong>{monthLabel}</strong>
-        <button className="nav-btn" onClick={() => changeMonth(1)} aria-label="Nächster Monat">
+        <strong>{rangeLabel}</strong>
+        <button className="nav-btn" onClick={() => changeBlock(1)} aria-label="Nächste 4 Wochen">
           ›
         </button>
       </div>
