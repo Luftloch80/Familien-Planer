@@ -59,11 +59,10 @@ export function useFamilyStore() {
     if (isFirebaseConfigured && db) {
       try {
         await updateDoc(familyDocRef, { [path]: value })
-        return
       } catch {
-        // Dokument existiert evtl. noch nicht
-        await setDoc(familyDocRef, DEFAULT_DATA, { merge: true })
-        await updateDoc(familyDocRef, { [path]: value })
+        // Netzwerk-/Verbindungsproblem: nicht auf das ganze Dokument zurückfallen,
+        // das würde andere Felder (z.B. credentials) überschreiben. Lokaler Stand
+        // bleibt erhalten, der nächste erfolgreiche Schreibvorgang holt es nach.
       }
     }
   }, [])
