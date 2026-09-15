@@ -76,7 +76,7 @@ export default function TodayView({ data, store }) {
           target="_blank"
           rel="noopener noreferrer"
         >
-          🍽️ Essensbestellung
+          🍽️ Cantinorant
         </a>
       </div>
     </div>
