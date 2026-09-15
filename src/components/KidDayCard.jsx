@@ -15,17 +15,21 @@ export default function KidDayCard({ kid, date, data, store, compact = false, sa
   return (
     <div className="kid-card" style={{ '--kid-color': kid.color }}>
       <button className="kid-card-summary" onClick={() => setOpen((o) => !o)}>
-        <span className="kid-dot" />
-        <span className="kid-name">{kid.name}</span>
-        <span className={`kid-time ${timeClass}`}>
-          {time ?? '–'}
-          {exception?.time && <span className="badge">Ausnahme</span>}
-        </span>
-        <span className="kid-label">{label}</span>
-        <span className={`kid-person ${person ? '' : 'kid-person-empty'}`}>
-          {person ?? 'wer holt ab?'}
-        </span>
-        <span className="chevron">{open ? '▲' : '▼'}</span>
+        <div className="kid-summary-row">
+          <span className="kid-dot" />
+          <span className="kid-name">{kid.name}</span>
+          <span className={`kid-time ${timeClass}`}>
+            {time ?? '–'}
+            {exception?.time && <span className="badge">Ausnahme</span>}
+          </span>
+        </div>
+        <div className="kid-summary-row">
+          <span className="kid-label">{label}</span>
+          <span className={`kid-person ${person ? '' : 'kid-person-empty'}`}>
+            {person ?? 'wer holt ab?'}
+          </span>
+          <span className="chevron">{open ? '▲' : '▼'}</span>
+        </div>
       </button>
 
       {open && !compact && (
