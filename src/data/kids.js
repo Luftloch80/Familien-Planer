@@ -5,6 +5,8 @@ import { isSchoolDay } from '../lib/holidays.js'
 
 export { WEEKDAYS } from '../lib/dates.js'
 
+export const EXCUSE_URL = 'https://gutenhalde.de/schueler-entschuldigen/'
+
 export const KIDS = [
   {
     id: 'emma',

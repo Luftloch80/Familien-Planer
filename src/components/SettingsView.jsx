@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { KIDS } from '../data/kids.js'
+import { KIDS, EXCUSE_URL } from '../data/kids.js'
 import { isFirebaseConfigured } from '../lib/firebase.js'
 import { HOLIDAYS } from '../lib/holidays.js'
 
@@ -101,6 +101,17 @@ export default function SettingsView({ data, store, synced }) {
       </section>
 
       <section className="settings-section">
+        <h2>Zugangsdaten Schüler-Entschuldigung</h2>
+        <p className="status-warn">
+          Für <a href={EXCUSE_URL} target="_blank" rel="noopener noreferrer">gutenhalde.de/schueler-entschuldigen</a>.
+          Wird über eure Firebase-Datenbank synchronisiert, nicht im Programmcode gespeichert.
+        </p>
+        {KIDS.map((kid) => (
+          <CredentialRow key={kid.id} kid={kid} data={data} store={store} />
+        ))}
+      </section>
+
+      <section className="settings-section">
         <h2>Ferien (keine Schule)</h2>
         <ul className="kid-schedule-summary">
           {HOLIDAYS.map((h) => (
@@ -110,6 +121,36 @@ export default function SettingsView({ data, store, synced }) {
           ))}
         </ul>
       </section>
+    </div>
+  )
+}
+
+function CredentialRow({ kid, data, store }) {
+  const stored = data.credentials?.[kid.id] ?? {}
+  const [username, setUsername] = useState(stored.username ?? '')
+  const [password, setPassword] = useState(stored.password ?? '')
+
+  function save() {
+    store.setCredential(kid.id, { username, password })
+  }
+
+  return (
+    <div className="add-person-row">
+      <strong style={{ color: kid.color, minWidth: '5.5em' }}>{kid.name}</strong>
+      <input
+        type="text"
+        placeholder="Benutzername"
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+        onBlur={save}
+      />
+      <input
+        type="password"
+        placeholder="Passwort"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        onBlur={save}
+      />
     </div>
   )
 }

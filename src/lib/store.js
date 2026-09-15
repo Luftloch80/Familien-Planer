@@ -7,6 +7,7 @@ const DEFAULT_DATA = {
   people: ['Familie Droste', 'Familie Klein', 'Familie Heyer', 'Sonstige'],
   assignments: {},
   exceptions: {},
+  credentials: {},
 }
 
 function readLocal() {
@@ -142,6 +143,17 @@ export function useFamilyStore() {
     [updateLocalAndMaybeRemote],
   )
 
+  const setCredential = useCallback(
+    (kidId, credential) => {
+      updateLocalAndMaybeRemote(
+        (prev) => ({ ...prev, credentials: { ...prev.credentials, [kidId]: credential } }),
+        `credentials.${kidId}`,
+        credential,
+      )
+    },
+    [updateLocalAndMaybeRemote],
+  )
+
   return {
     data: data ?? DEFAULT_DATA,
     ready,
@@ -151,5 +163,6 @@ export function useFamilyStore() {
     setException,
     clearException,
     setPeople,
+    setCredential,
   }
 }
