@@ -179,13 +179,20 @@ export default function MonthOverview({ data }) {
           ]),
           theme: 'grid',
           styles: {
-            fontSize: 6.5,
-            cellPadding: 1,
+            fontSize: 6,
+            cellPadding: 0.8,
             valign: 'top',
             lineWidth: 0.25,
             lineColor: [90, 90, 90],
+            minCellHeight: 9,
           },
-          headStyles: { fillColor: [106, 90, 205], fontSize: 6.5, lineWidth: 0.25, lineColor: [90, 90, 90] },
+          headStyles: {
+            fillColor: [106, 90, 205],
+            fontSize: 6,
+            lineWidth: 0.25,
+            lineColor: [90, 90, 90],
+            minCellHeight: 4.5,
+          },
           columnStyles,
           didParseCell: (hookData) => {
             if (hookData.section === 'body' && block.rows[hookData.row.index]?.isWeekend) {
