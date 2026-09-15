@@ -1,27 +1,25 @@
 import { useEffect, useRef } from 'react'
-import { addDays, isSameDate, toISODate, startOfWeek } from '../lib/dates.js'
+import { addDays, isSameDate, toISODate, weekdayName } from '../lib/dates.js'
 
-const WEEKS_BEFORE = 2
-const WEEKS_AFTER = 6
+const SCHOOL_DAYS_AHEAD = 30 // ca. 6 Wochen
 
 export default function DayScroller({ selected, onSelect }) {
   const scrollerRef = useRef(null)
   const activeRef = useRef(null)
 
-  const monday = startOfWeek(new Date())
-  const start = addDays(monday, -7 * WEEKS_BEFORE)
+  const today = new Date()
   const days = []
-  for (let w = 0; w < WEEKS_BEFORE + WEEKS_AFTER + 1; w++) {
-    for (let d = 0; d < 5; d++) {
-      days.push(addDays(start, w * 7 + d))
+  for (let offset = 0, found = 0; found < SCHOOL_DAYS_AHEAD; offset++) {
+    const date = addDays(today, offset)
+    if (weekdayName(date)) {
+      days.push(date)
+      found++
     }
   }
 
   useEffect(() => {
     activeRef.current?.scrollIntoView({ inline: 'center', block: 'nearest' })
   }, [])
-
-  const today = new Date()
 
   return (
     <div className="day-scroller" ref={scrollerRef}>
