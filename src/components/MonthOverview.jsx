@@ -109,10 +109,10 @@ export default function MonthOverview({ data, onClose }) {
           fontSize: 7,
           cellPadding: 1.2,
           valign: 'top',
-          lineWidth: 0.15,
-          lineColor: [180, 180, 180],
+          lineWidth: 0.3,
+          lineColor: [90, 90, 90],
         },
-        headStyles: { fillColor: [106, 90, 205] },
+        headStyles: { fillColor: [106, 90, 205], lineWidth: 0.3, lineColor: [90, 90, 90] },
         columnStyles,
         didParseCell: (hookData) => {
           if (hookData.section === 'body' && rows[hookData.row.index]?.isWeekend) {
