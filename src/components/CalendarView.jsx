@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { KIDS } from '../data/kids.js'
 import { weekdayName, toISODate, isSameDate } from '../lib/dates.js'
-import { isSchoolDay, holidayLabel, extraSchoolDayLabel } from '../lib/holidays.js'
+import { isSchoolDay, holidayLabel, extraSchoolDayLabel, feiertagLabel } from '../lib/holidays.js'
 import { resolvePickup } from '../lib/pickup.js'
 
 const WEEKDAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
@@ -25,7 +25,7 @@ function dayInfo(date, data) {
   const dateISO = toISODate(date)
   const weekday = weekdayName(date)
   const school = isSchoolDay(date)
-  const holiday = holidayLabel(date)
+  const holiday = holidayLabel(date) ?? feiertagLabel(date)
 
   const perKid = KIDS.map((kid) => {
     const kidPickup = resolvePickup(kid, date, data)

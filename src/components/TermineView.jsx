@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { HOLIDAYS } from '../lib/holidays.js'
+import { HOLIDAYS, FEIERTAGE } from '../lib/holidays.js'
 import { KIDS, WEEKDAYS } from '../data/kids.js'
 import TimeSelect from './TimeSelect.jsx'
 import KwBlockOverview from './KwBlockOverview.jsx'
@@ -48,6 +48,17 @@ export default function TermineView({ data, store }) {
           {HOLIDAYS.map((h) => (
             <li key={h.label}>
               {h.label}: {formatHolidayDate(h.start)} – {formatHolidayDate(h.end)}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="settings-section">
+        <h2>Feiertage</h2>
+        <ul className="kid-schedule-summary">
+          {FEIERTAGE.map((f) => (
+            <li key={f.date}>
+              {f.label}: {formatHolidayDate(f.date)}
             </li>
           ))}
         </ul>

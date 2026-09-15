@@ -24,6 +24,24 @@ export const EXTRA_SCHOOL_DAYS = [
   { date: '2027-06-26', label: 'Schulfeier/Sommerfest/Johannifeuer' },
 ]
 
+// Gesetzliche Feiertage laut Jahresplan. Die meisten liegen bereits
+// innerhalb einer HOLIDAYS-Ferienspanne; Christi Himmelfahrt (06.05.2027)
+// ist der einzige, der frei zwischen zwei Ferienblöcken liegt.
+export const FEIERTAGE = [
+  { date: '2026-10-03', label: 'Tag der Deutschen Einheit' },
+  { date: '2026-11-01', label: 'Allerheiligen' },
+  { date: '2026-12-25', label: '1. Weihnachtstag' },
+  { date: '2026-12-26', label: '2. Weihnachtstag' },
+  { date: '2027-01-01', label: 'Neujahr' },
+  { date: '2027-01-06', label: 'Heilige Drei Könige' },
+  { date: '2027-03-26', label: 'Karfreitag' },
+  { date: '2027-03-29', label: 'Ostermontag' },
+  { date: '2027-05-01', label: 'Tag der Arbeit' },
+  { date: '2027-05-06', label: 'Christi Himmelfahrt' },
+  { date: '2027-05-17', label: 'Pfingstmontag' },
+  { date: '2027-05-27', label: 'Fronleichnam' },
+]
+
 export function holidayLabel(date) {
   const iso = toISODate(date)
   return HOLIDAYS.find((h) => iso >= h.start && iso <= h.end)?.label ?? null
@@ -34,11 +52,17 @@ export function extraSchoolDayLabel(date) {
   return EXTRA_SCHOOL_DAYS.find((d) => d.date === iso)?.label ?? null
 }
 
+export function feiertagLabel(date) {
+  const iso = toISODate(date)
+  return FEIERTAGE.find((f) => f.date === iso)?.label ?? null
+}
+
 export function isSchoolDay(date) {
   const iso = toISODate(date)
   if (iso < TERM_START || iso > TERM_END) return false
   if (extraSchoolDayLabel(date)) return true
   if (!weekdayName(date)) return false
   if (holidayLabel(date)) return false
+  if (feiertagLabel(date)) return false
   return true
 }

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { KIDS } from '../data/kids.js'
 import { weekdayName, addDays, formatShort, isSameDate } from '../lib/dates.js'
-import { isSchoolDay, holidayLabel, extraSchoolDayLabel } from '../lib/holidays.js'
+import { isSchoolDay, holidayLabel, extraSchoolDayLabel, feiertagLabel } from '../lib/holidays.js'
 import { pickupTimeMatches, resolvePickup } from '../lib/pickup.js'
 import { FOOD_ORDER_URL } from '../data/kids.js'
 import KidDayCard from './KidDayCard.jsx'
@@ -39,7 +39,7 @@ export default function TodayView({ data, store }) {
   const today = new Date()
   const isToday = isSameDate(target, today)
   const weekday = weekdayName(target)
-  const holiday = holidayLabel(target)
+  const holiday = holidayLabel(target) ?? feiertagLabel(target)
   const extra = extraSchoolDayLabel(target)
   const isSchool = isSchoolDay(target)
   // Abholplan gibt es nur Mo-Fr - zusätzliche Schultage am Wochenende (z.B.
