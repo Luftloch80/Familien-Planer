@@ -129,8 +129,9 @@ export default function MonthOverview({ data }) {
       const equalColWidth = blockWidth / totalCols
       const columnStyles = {}
       for (let c = 0; c < totalCols; c++) columnStyles[c] = { cellWidth: equalColWidth }
-      // Datum-Spalte (0) größer und fett hervorheben.
-      columnStyles[0] = { ...columnStyles[0], fontSize: 7.5, fontStyle: 'bold' }
+      // Datum-Spalte (0) größer, fett und (anders als der Rest, der oben
+      // ausgerichtet ist) auch vertikal mittig in der Zelle zentriert.
+      columnStyles[0] = { ...columnStyles[0], fontSize: 7.5, fontStyle: 'bold', valign: 'middle' }
 
       // Feste, bereits erprobte Werte statt dynamischer Skalierung: bei größerer
       // Schrift kann Text in den schmalen gleich breiten Spalten umbrechen und
