@@ -2,21 +2,21 @@ import { useState } from 'react'
 import { useFamilyStore } from './lib/store.js'
 import TodayView from './components/TodayView.jsx'
 import TermineView from './components/TermineView.jsx'
-import SettingsView from './components/SettingsView.jsx'
+import CalendarView from './components/CalendarView.jsx'
 import MonthOverview from './components/MonthOverview.jsx'
 import './App.css'
 
 const TABS = [
   { id: 'today', label: 'Schule', icon: '🏫' },
   { id: 'termine', label: 'Termine', icon: '📅' },
-  { id: 'settings', label: 'Einstellungen', icon: '⚙️' },
+  { id: 'calendar', label: 'Kalender', icon: '🗓️' },
 ]
 
 export default function App() {
   const [tab, setTab] = useState('today')
   const [showMonthOverview, setShowMonthOverview] = useState(false)
   const store = useFamilyStore()
-  const { data, ready, synced } = store
+  const { data, ready } = store
 
   if (!ready) {
     return (
@@ -37,7 +37,7 @@ export default function App() {
         {tab === 'termine' && (
           <TermineView data={data} store={store} onOpenMonthOverview={() => setShowMonthOverview(true)} />
         )}
-        {tab === 'settings' && <SettingsView synced={synced} />}
+        {tab === 'calendar' && <CalendarView data={data} />}
       </main>
 
       <nav className="tab-bar">
