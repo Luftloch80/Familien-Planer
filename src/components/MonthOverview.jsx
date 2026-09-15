@@ -79,17 +79,12 @@ function capLines(lines) {
 }
 
 export default function MonthOverview({ data }) {
-  // Kein Monatsbezug mehr: immer genau 4 volle Kalenderwochen (Mo-So) ab
-  // einem verschiebbaren Anker, der standardmäßig bei der aktuellen Woche
-  // startet - "Aktueller KW Block".
-  const [anchorMonday, setAnchorMonday] = useState(() => startOfWeek(new Date()))
+  // Kein Monatsbezug und keine Navigation: immer genau die 4 vollen
+  // Kalenderwochen (Mo-So), die die aktuelle Woche enthalten.
+  const anchorMonday = startOfWeek(new Date())
   const [selectedKidIds, setSelectedKidIds] = useState(() => KIDS.map((k) => k.id))
   const [showDuty, setShowDuty] = useState(true)
   const [generating, setGenerating] = useState(false)
-
-  function changeBlock(delta) {
-    setAnchorMonday((prev) => addDays(prev, delta * 28))
-  }
 
   function toggleKid(id) {
     setSelectedKidIds((prev) =>
@@ -102,6 +97,7 @@ export default function MonthOverview({ data }) {
   const rows = buildRows(days, kids, data)
 
   const rangeLabel = `${days[0].toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} – ${days[27].toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}`
+  const weekRangeLabel = `KW ${isoWeekNumber(days[0])}–${isoWeekNumber(days[27])}`
 
   async function showPdf() {
     setGenerating(true)
@@ -133,6 +129,8 @@ export default function MonthOverview({ data }) {
       const equalColWidth = blockWidth / totalCols
       const columnStyles = {}
       for (let c = 0; c < totalCols; c++) columnStyles[c] = { cellWidth: equalColWidth }
+      // Datum-Spalte (0) größer und fett hervorheben.
+      columnStyles[0] = { ...columnStyles[0], fontSize: 7.5, fontStyle: 'bold' }
 
       // Feste, bereits erprobte Werte statt dynamischer Skalierung: bei größerer
       // Schrift kann Text in den schmalen gleich breiten Spalten umbrechen und
@@ -176,6 +174,7 @@ export default function MonthOverview({ data }) {
             fontSize: bodyFontSize,
             cellPadding: bodyCellPadding,
             valign: 'top',
+            halign: 'center',
             lineWidth: 0.25,
             lineColor: [90, 90, 90],
             minCellHeight: bodyRowHeight,
@@ -183,6 +182,7 @@ export default function MonthOverview({ data }) {
           headStyles: {
             fillColor: [106, 90, 205],
             fontSize: bodyFontSize,
+            halign: 'center',
             lineWidth: 0.25,
             lineColor: [90, 90, 90],
             minCellHeight: headerHeight,
@@ -205,16 +205,6 @@ export default function MonthOverview({ data }) {
 
   return (
     <>
-      <div className="month-nav">
-        <button className="nav-btn" onClick={() => changeBlock(-1)} aria-label="Vorherige 4 Wochen">
-          ‹
-        </button>
-        <strong>{rangeLabel}</strong>
-        <button className="nav-btn" onClick={() => changeBlock(1)} aria-label="Nächste 4 Wochen">
-          ›
-        </button>
-      </div>
-
       <div className="month-kid-picker">
         {KIDS.map((kid) => (
           <label key={kid.id} className="month-kid-checkbox">
@@ -233,7 +223,7 @@ export default function MonthOverview({ data }) {
       </div>
 
       <button className="btn-small btn-primary" onClick={showPdf} disabled={generating}>
-        {generating ? 'Erstelle PDF…' : 'PDF erstellen'}
+        {generating ? 'Erstelle PDF…' : `PDF erstellen · ${weekRangeLabel} (${rangeLabel})`}
       </button>
     </>
   )
