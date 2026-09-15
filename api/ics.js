@@ -36,9 +36,17 @@ export default async function handler(req, res) {
 
     result.sort((a, b) => a.start.localeCompare(b.start))
 
+    const components = Object.values(data)
+    const debug = {
+      totalComponents: components.length,
+      totalVevents: components.filter((c) => c.type === 'VEVENT').length,
+      recurringVevents: components.filter((c) => c.type === 'VEVENT' && c.rrule).length,
+      horizonDays: HORIZON_DAYS,
+    }
+
     res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=3600')
-    res.status(200).json({ events: result })
-  } catch {
-    res.status(502).json({ error: 'Kalender konnte nicht geladen werden' })
+    res.status(200).json({ events: result, debug })
+  } catch (err) {
+    res.status(502).json({ error: 'Kalender konnte nicht geladen werden', detail: String(err) })
   }
 }
