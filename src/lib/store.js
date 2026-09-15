@@ -154,9 +154,8 @@ export function useFamilyStore() {
     [updateLocalAndMaybeRemote],
   )
 
-  const addRecurringEvent = useCallback(
-    (kidId, event) => {
-      const id = `${Date.now()}${Math.random().toString(36).slice(2, 8)}`
+  const setRecurringEvent = useCallback(
+    (kidId, id, event) => {
       updateLocalAndMaybeRemote(
         (prev) => ({
           ...prev,
@@ -170,6 +169,14 @@ export function useFamilyStore() {
       )
     },
     [updateLocalAndMaybeRemote],
+  )
+
+  const addRecurringEvent = useCallback(
+    (kidId, event) => {
+      const id = `${Date.now()}${Math.random().toString(36).slice(2, 8)}`
+      setRecurringEvent(kidId, id, event)
+    },
+    [setRecurringEvent],
   )
 
   const removeRecurringEvent = useCallback(
@@ -198,6 +205,7 @@ export function useFamilyStore() {
     setPeople,
     setCredential,
     addRecurringEvent,
+    setRecurringEvent,
     removeRecurringEvent,
   }
 }

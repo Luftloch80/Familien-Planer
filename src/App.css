@@ -465,6 +465,12 @@
   gap: 8px;
 }
 
+.recurring-item-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 .add-event-form {
   display: flex;
   flex-direction: column;
@@ -553,10 +559,6 @@
   gap: 10px;
 }
 
-.month-overview-title {
-  display: none;
-}
-
 .month-table {
   width: 100%;
   border-collapse: collapse;
@@ -590,30 +592,9 @@
   font-style: italic;
 }
 
-.month-options {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-variant-numeric: tabular-nums;
-}
-
-.month-events {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-top: 4px;
-  color: var(--accent);
-}
-
 @media print {
   .no-print {
     display: none !important;
-  }
-
-  .month-overview-title {
-    display: block;
-    margin: 0 0 12px;
-    font-size: 20px;
   }
 
   .month-overview {

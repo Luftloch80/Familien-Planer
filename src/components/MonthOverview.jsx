@@ -7,11 +7,37 @@ function daysInMonth(year, monthIndex) {
   return new Date(year, monthIndex + 1, 0).getDate()
 }
 
+// Baut für jeden Tag des Monats eine Zeile: Datumsbezeichnung + pro Kind
+// entweder "frei"/Ferien-Label oder die Abhol-Optionen + passende Termine.
+// Wird sowohl für die Bildschirm-Tabelle als auch für den PDF-Export genutzt.
+function buildRows(days, kids, data) {
+  return days.map((date) => {
+    const weekday = weekdayName(date)
+    const holiday = holidayLabel(date)
+    const school = isSchoolDay(date)
+    const dateLabel = `${date.toLocaleDateString('de-DE', { weekday: 'short' })} ${date.getDate()}.`
+    const cells = kids.map((kid) => {
+      if (!weekday) return { lines: [], holiday: null }
+      if (!school) return { lines: [], holiday: holiday ?? 'frei' }
+      const options = pickupOptions(kid, weekday, date)
+      const events = Object.values(data.recurringEvents?.[kid.id] ?? {}).filter(
+        (ev) => ev.weekday === weekday,
+      )
+      return {
+        lines: [...options.map((o) => `${o.label} ${o.time}`), ...events.map((e) => `${e.title} ${e.time}`)],
+        holiday: null,
+      }
+    })
+    return { dateLabel, cells, isWeekend: !weekday }
+  })
+}
+
 export default function MonthOverview({ data, onClose }) {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [monthIndex, setMonthIndex] = useState(now.getMonth())
   const [selectedKidIds, setSelectedKidIds] = useState(() => KIDS.map((k) => k.id))
+  const [generating, setGenerating] = useState(false)
 
   function changeMonth(delta) {
     let m = monthIndex + delta
@@ -40,6 +66,39 @@ export default function MonthOverview({ data, onClose }) {
 
   const days = Array.from({ length: daysInMonth(year, monthIndex) }, (_, i) => new Date(year, monthIndex, i + 1))
   const kids = KIDS.filter((k) => selectedKidIds.includes(k.id))
+  const rows = buildRows(days, kids, data)
+
+  async function showPdf() {
+    setGenerating(true)
+    try {
+      const { jsPDF } = await import('jspdf')
+      const autoTable = (await import('jspdf-autotable')).default
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+      doc.setFontSize(14)
+      doc.text(`Monatsübersicht ${monthLabel}`, 14, 12)
+
+      autoTable(doc, {
+        startY: 18,
+        head: [['Datum', ...kids.map((k) => k.name)]],
+        body: rows.map((r) => [
+          r.dateLabel,
+          ...r.cells.map((c) => c.holiday ?? c.lines.join('\n')),
+        ]),
+        styles: { fontSize: 9, cellPadding: 2, valign: 'top' },
+        headStyles: { fillColor: [106, 90, 205] },
+        didParseCell: (hookData) => {
+          if (hookData.section === 'body' && rows[hookData.row.index]?.isWeekend) {
+            hookData.cell.styles.fillColor = [245, 245, 245]
+          }
+        },
+      })
+
+      const url = URL.createObjectURL(doc.output('blob'))
+      window.open(url, '_blank')
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   return (
     <div className="month-overview">
@@ -56,8 +115,8 @@ export default function MonthOverview({ data, onClose }) {
             ›
           </button>
         </div>
-        <button className="btn-small btn-primary" onClick={() => window.print()}>
-          Drucken / Als PDF speichern
+        <button className="btn-small btn-primary" onClick={showPdf} disabled={generating}>
+          {generating ? 'Erstelle PDF…' : 'PDF anzeigen (Querformat)'}
         </button>
       </div>
 
@@ -74,8 +133,6 @@ export default function MonthOverview({ data, onClose }) {
         ))}
       </div>
 
-      <h1 className="month-overview-title">Monatsübersicht {monthLabel}</h1>
-
       <table className="month-table">
         <thead>
           <tr>
@@ -86,52 +143,20 @@ export default function MonthOverview({ data, onClose }) {
           </tr>
         </thead>
         <tbody>
-          {days.map((date) => {
-            const weekday = weekdayName(date)
-            const holiday = holidayLabel(date)
-            const school = isSchoolDay(date)
-            return (
-              <tr key={toISODate(date)} className={!weekday ? 'month-row-weekend' : !school ? 'month-row-holiday' : ''}>
-                <td className="month-date-cell">
-                  {date.toLocaleDateString('de-DE', { weekday: 'short' })} {date.getDate()}.
+          {rows.map((row, i) => (
+            <tr key={toISODate(days[i])} className={row.isWeekend ? 'month-row-weekend' : ''}>
+              <td className="month-date-cell">{row.dateLabel}</td>
+              {row.cells.map((cell, j) => (
+                <td key={kids[j].id} className={cell.holiday ? 'month-holiday-cell' : ''}>
+                  {cell.holiday ? (
+                    cell.holiday
+                  ) : (
+                    cell.lines.map((line, k) => <div key={k}>{line}</div>)
+                  )}
                 </td>
-                {kids.map((kid) => {
-                  if (!weekday) return <td key={kid.id} />
-                  if (!school) {
-                    return (
-                      <td key={kid.id} className="month-holiday-cell">
-                        {holiday ?? 'frei'}
-                      </td>
-                    )
-                  }
-                  const options = pickupOptions(kid, weekday, date)
-                  const events = Object.values(data.recurringEvents?.[kid.id] ?? {}).filter(
-                    (ev) => ev.weekday === weekday,
-                  )
-                  return (
-                    <td key={kid.id}>
-                      <div className="month-options">
-                        {options.map((opt) => (
-                          <span key={opt.key}>
-                            {opt.label} {opt.time}
-                          </span>
-                        ))}
-                      </div>
-                      {events.length > 0 && (
-                        <div className="month-events">
-                          {events.map((ev, i) => (
-                            <span key={i}>
-                              {ev.title} {ev.time}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </td>
-                  )
-                })}
-              </tr>
-            )
-          })}
+              ))}
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
