@@ -207,6 +207,14 @@
   gap: 6px;
 }
 
+.kid-time-same {
+  color: var(--ok);
+}
+
+.kid-time-diff {
+  color: var(--danger);
+}
+
 .badge {
   font-size: 10px;
   font-weight: 600;

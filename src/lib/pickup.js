@@ -23,3 +23,11 @@ export function resolvePickup(kid, date, data) {
 
   return { weekday, options, chosenKey, time, label, person, exception, key }
 }
+
+// true = alle Kinder werden zur gleichen Uhrzeit abgeholt (ein Weg reicht),
+// false = die Zeiten unterscheiden sich, null = nicht anwendbar (z.B. Ferien).
+export function allPickupTimesMatch(kids, date, data) {
+  const times = kids.map((kid) => resolvePickup(kid, date, data)?.time ?? null)
+  if (times.some((t) => !t)) return null
+  return times.every((t) => t === times[0])
+}

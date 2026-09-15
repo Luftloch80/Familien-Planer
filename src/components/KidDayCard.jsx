@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { toISODate } from '../lib/dates.js'
 import { resolvePickup } from '../lib/pickup.js'
 
-export default function KidDayCard({ kid, date, data, store, compact = false }) {
+export default function KidDayCard({ kid, date, data, store, compact = false, sameTime = null }) {
   const [open, setOpen] = useState(false)
   const result = resolvePickup(kid, date, data)
   const dateISO = toISODate(date)
@@ -10,13 +10,14 @@ export default function KidDayCard({ kid, date, data, store, compact = false }) 
   if (!result) return null
 
   const { options, chosenKey, time, label, person, exception } = result
+  const timeClass = sameTime === true ? 'kid-time-same' : sameTime === false ? 'kid-time-diff' : ''
 
   return (
     <div className="kid-card" style={{ '--kid-color': kid.color }}>
       <button className="kid-card-summary" onClick={() => setOpen((o) => !o)}>
         <span className="kid-dot" />
         <span className="kid-name">{kid.name}</span>
-        <span className="kid-time">
+        <span className={`kid-time ${timeClass}`}>
           {time ?? '–'}
           {exception?.time && <span className="badge">Ausnahme</span>}
         </span>
