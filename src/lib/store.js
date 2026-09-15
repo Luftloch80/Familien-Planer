@@ -4,7 +4,7 @@ import { db, familyDocRef, isFirebaseConfigured } from './firebase.js'
 
 const LOCAL_KEY = 'familienplaner-data'
 const DEFAULT_DATA = {
-  people: ['Familie Droste', 'Familie Klein', 'Familie Heyer', 'Sonstige'],
+  people: ['Droste', 'Klein', 'Heyer', 'Sonstige'],
   assignments: {},
   exceptions: {},
   credentials: {},
