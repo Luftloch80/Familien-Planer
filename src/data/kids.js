@@ -13,7 +13,7 @@ export const KIDS = [
     color: '#7c6fd6',
     schedule: {
       Montag: { regular: '13:10' },
-      Dienstag: { regular: '12:25' },
+      Dienstag: { regular: '13:10' },
       Mittwoch: { regular: '11:35' },
       Donnerstag: { regular: '13:10' },
       // Chor ist keine wählbare Option, sondern findet alle 2 Wochen statt
@@ -32,7 +32,7 @@ export const KIDS = [
       cycle: ['We', 'Ha', 'Ga'],
       overrides: {
         Montag: { We: '13:10', Ha: '13:10', Ga: '12:25' },
-        Mittwoch: { We: '11:35', Ha: '12:25', Ga: '12:25' },
+        Mittwoch: { We: '11:35', Ha: '13:10', Ga: '13:10' },
         Donnerstag: { We: '13:10', Ha: '11:35', Ga: '13:10' },
       },
     },
