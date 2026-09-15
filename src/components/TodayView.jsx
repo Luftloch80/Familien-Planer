@@ -2,23 +2,39 @@ import { useState } from 'react'
 import { KIDS } from '../data/kids.js'
 import { weekdayName, addDays, formatShort, isSameDate } from '../lib/dates.js'
 import { isSchoolDay, holidayLabel } from '../lib/holidays.js'
-import { pickupTimeMatches } from '../lib/pickup.js'
+import { pickupTimeMatches, resolvePickup } from '../lib/pickup.js'
 import KidDayCard from './KidDayCard.jsx'
 import DayScroller from './DayScroller.jsx'
 
 const MAX_LOOKAHEAD_DAYS = 400
 
-function initialTarget() {
+function nowAsHM(now) {
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+}
+
+function latestPickupTime(date, data) {
+  return KIDS.reduce((max, kid) => {
+    const t = resolvePickup(kid, date, data)?.time
+    return t && t > max ? t : max
+  }, '')
+}
+
+function initialTarget(data) {
   const now = new Date()
   for (let offset = 0; offset < MAX_LOOKAHEAD_DAYS; offset++) {
     const date = addDays(now, offset)
-    if (isSchoolDay(date)) return date
+    if (!isSchoolDay(date)) continue
+    if (offset === 0) {
+      const maxTime = latestPickupTime(date, data)
+      if (maxTime && nowAsHM(now) > maxTime) continue // heute schon vorbei -> nächster Schultag
+    }
+    return date
   }
   return now
 }
 
 export default function TodayView({ data, store }) {
-  const [target, setTarget] = useState(initialTarget)
+  const [target, setTarget] = useState(() => initialTarget(data))
   const today = new Date()
   const isToday = isSameDate(target, today)
   const weekday = weekdayName(target)
