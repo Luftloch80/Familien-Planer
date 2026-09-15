@@ -3,6 +3,7 @@ import { KIDS } from '../data/kids.js'
 import { weekdayName, addDays, formatShort, isSameDate } from '../lib/dates.js'
 import { isSchoolDay, holidayLabel } from '../lib/holidays.js'
 import { pickupTimeMatches, resolvePickup } from '../lib/pickup.js'
+import { FOOD_ORDER_URL } from '../data/kids.js'
 import KidDayCard from './KidDayCard.jsx'
 import DayScroller from './DayScroller.jsx'
 
@@ -68,6 +69,15 @@ export default function TodayView({ data, store }) {
         ) : (
           <p className="hint">{holiday ? `${holiday} – keine Schule.` : 'An diesem Tag ist keine Schule.'}</p>
         )}
+
+        <a
+          className="external-link-btn"
+          href={FOOD_ORDER_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          🍽️ Essensbestellung
+        </a>
       </div>
     </div>
   )

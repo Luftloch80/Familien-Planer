@@ -318,6 +318,21 @@
   flex-direction: column;
 }
 
+.external-link-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+}
+
 /* Week view */
 .week-grid {
   display: grid;

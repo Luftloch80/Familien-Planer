@@ -1,6 +1,6 @@
 import { toISODate } from '../lib/dates.js'
 import { resolvePickup } from '../lib/pickup.js'
-import { EXCUSE_URL, FOOD_ORDER_URL } from '../data/kids.js'
+import { EXCUSE_URL } from '../data/kids.js'
 
 function nextPerson(current, people) {
   if (!current) return people[0] ?? null
@@ -44,15 +44,6 @@ export default function KidDayCard({ kid, date, data, store, sameTime = null }) 
             <span className="kid-name">{kid.name}</span>
           </div>
           <div className="kid-icons-row">
-            <a
-              className="icon-btn"
-              href={FOOD_ORDER_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Essen bestellen"
-            >
-              🍽️
-            </a>
             <a
               className="icon-btn"
               href={EXCUSE_URL}
