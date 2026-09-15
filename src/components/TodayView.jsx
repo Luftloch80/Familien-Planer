@@ -52,15 +52,6 @@ export default function TodayView({ data, store }) {
         ) : (
           <p className="hint">{holiday ? `${holiday} – keine Schule.` : 'An diesem Tag ist keine Schule.'}</p>
         )}
-
-        <a
-          className="external-link-btn"
-          href="https://gutenhalde.cantinorant.com"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          🍽️ Essensbestellung
-        </a>
       </div>
     </div>
   )

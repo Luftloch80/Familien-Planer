@@ -183,6 +183,7 @@
   padding: 12px 14px;
   text-align: left;
   color: var(--text);
+  cursor: pointer;
 }
 
 .kid-summary-row {
@@ -202,8 +203,28 @@
 
 .kid-name {
   font-weight: 600;
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.icon-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 15px;
+  text-decoration: none;
+  line-height: 1;
+}
+
+.icon-btn-pin {
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
 }
 
 .kid-time {
@@ -213,6 +234,7 @@
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .kid-time-same {

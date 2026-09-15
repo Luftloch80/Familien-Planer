@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { toISODate } from '../lib/dates.js'
 import { resolvePickup } from '../lib/pickup.js'
-import { EXCUSE_URL } from '../data/kids.js'
+import { EXCUSE_URL, FOOD_ORDER_URL } from '../data/kids.js'
 
 export default function KidDayCard({ kid, date, data, store, compact = false, sameTime = null }) {
   const [open, setOpen] = useState(false)
@@ -12,13 +12,40 @@ export default function KidDayCard({ kid, date, data, store, compact = false, sa
 
   const { options, chosenKey, time, label, person, exception } = result
   const timeClass = sameTime === true ? 'kid-time-same' : sameTime === false ? 'kid-time-diff' : ''
+  const pin = data.credentials?.[kid.id]?.password
 
   return (
     <div className="kid-card" style={{ '--kid-color': kid.color }}>
-      <button className="kid-card-summary" onClick={() => setOpen((o) => !o)}>
+      <div
+        className="kid-card-summary"
+        role="button"
+        tabIndex={0}
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setOpen((o) => !o)}
+      >
         <div className="kid-summary-row">
           <span className="kid-dot" />
           <span className="kid-name">{kid.name}</span>
+          <a
+            className="icon-btn"
+            href={FOOD_ORDER_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Essen bestellen"
+            onClick={(e) => e.stopPropagation()}
+          >
+            🍽️
+          </a>
+          <a
+            className="icon-btn"
+            href={EXCUSE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Krankmeldung"
+            onClick={(e) => e.stopPropagation()}
+          >
+            🤒{pin && <span className="icon-btn-pin">{pin}</span>}
+          </a>
           <span className={`kid-time ${timeClass}`}>
             {time ?? '–'}
             {exception?.time && <span className="badge">Ausnahme</span>}
@@ -31,7 +58,7 @@ export default function KidDayCard({ kid, date, data, store, compact = false, sa
           </span>
           <span className="chevron">{open ? '▲' : '▼'}</span>
         </div>
-      </button>
+      </div>
 
       {open && !compact && (
         <div className="kid-card-detail">
