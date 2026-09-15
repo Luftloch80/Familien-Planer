@@ -8,12 +8,31 @@ function formatHolidayDate(iso) {
   return `${d}.${m}.${y.slice(2)}`
 }
 
+function formatDateDMY(iso) {
+  const [y, m, d] = iso.split('-')
+  return `${d}.${m}.${y}`
+}
+
 export default function TermineView({ data, store, onOpenMonthOverview }) {
   return (
     <div className="view">
       <div className="view-header">
         <h1>Termine</h1>
       </div>
+
+      {KIDS.map((kid) => (
+        <KidTermineDropdown key={kid.id} kid={kid} data={data} store={store} />
+      ))}
+
+      <section className="settings-section">
+        <h2>Monatsübersicht</h2>
+        <p className="status-warn">
+          Alle Abholzeiten und wiederkehrenden Termine eines Monats als PDF (Querformat).
+        </p>
+        <button className="btn-small btn-primary" onClick={onOpenMonthOverview}>
+          Monatsübersicht öffnen
+        </button>
+      </section>
 
       <section className="settings-section">
         <h2>Ferien (keine Schule)</h2>
@@ -25,29 +44,43 @@ export default function TermineView({ data, store, onOpenMonthOverview }) {
           ))}
         </ul>
       </section>
-
-      <section className="settings-section">
-        <h2>Wiederkehrende Termine</h2>
-        {KIDS.map((kid) => (
-          <RecurringEventsForKid key={kid.id} kid={kid} data={data} store={store} />
-        ))}
-      </section>
-
-      <section className="settings-section">
-        <h2>Einmalige Termine</h2>
-        <OneOffEvents data={data} store={store} />
-      </section>
-
-      <section className="settings-section">
-        <h2>Monatsübersicht</h2>
-        <p className="status-warn">
-          Alle Abholzeiten und wiederkehrenden Termine eines Monats als PDF (Querformat).
-        </p>
-        <button className="btn-small btn-primary" onClick={onOpenMonthOverview}>
-          Monatsübersicht öffnen
-        </button>
-      </section>
     </div>
+  )
+}
+
+function KidTermineDropdown({ kid, data, store }) {
+  const [open, setOpen] = useState(false)
+  const recurringCount = Object.keys(data.recurringEvents?.[kid.id] ?? {}).length
+  const oneOffCount = Object.values(data.oneOffEvents ?? {}).filter((ev) => ev.kidId === kid.id).length
+  const total = recurringCount + oneOffCount
+
+  return (
+    <section className="settings-section">
+      <button
+        type="button"
+        className="termine-dropdown-toggle"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+      >
+        <strong style={{ color: kid.color }}>{kid.name}</strong>
+        <span className="termine-dropdown-meta">
+          {total} Termin{total === 1 ? '' : 'e'}
+          <span className="termine-dropdown-arrow" aria-hidden="true">
+            {open ? '▲' : '▼'}
+          </span>
+        </span>
+      </button>
+
+      {open && (
+        <div className="termine-dropdown-body">
+          <h3>Wiederkehrend</h3>
+          <RecurringEventsForKid kid={kid} data={data} store={store} />
+
+          <h3>Einmalig</h3>
+          <OneOffEventsForKid kid={kid} data={data} store={store} />
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -60,8 +93,7 @@ function RecurringEventsForKid({ kid, data, store }) {
   )
 
   return (
-    <div className="recurring-kid-block">
-      <strong style={{ color: kid.color }}>{kid.name}</strong>
+    <div>
       {events.length > 0 && (
         <ul className="kid-schedule-summary recurring-list">
           {events.map(([id, ev]) =>
@@ -123,28 +155,16 @@ function RecurringEventsForKid({ kid, data, store }) {
   )
 }
 
-function formatDateDMY(iso) {
-  const [y, m, d] = iso.split('-')
-  return `${d}.${m}.${y}`
-}
-
-function OneOffEvents({ data, store }) {
+function OneOffEventsForKid({ kid, data, store }) {
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState(null)
 
-  const events = Object.entries(data.oneOffEvents ?? {}).sort(
-    (a, b) =>
-      KIDS.findIndex((k) => k.id === a[1].kidId) - KIDS.findIndex((k) => k.id === b[1].kidId) ||
-      a[1].date.localeCompare(b[1].date) ||
-      a[1].time.localeCompare(b[1].time),
-  )
-
-  function kidOf(id) {
-    return KIDS.find((k) => k.id === id)
-  }
+  const events = Object.entries(data.oneOffEvents ?? {})
+    .filter(([, ev]) => ev.kidId === kid.id)
+    .sort((a, b) => a[1].date.localeCompare(b[1].date) || a[1].time.localeCompare(b[1].time))
 
   return (
-    <div className="recurring-kid-block">
+    <div>
       {events.length > 0 && (
         <ul className="kid-schedule-summary recurring-list">
           {events.map(([id, ev]) =>
@@ -163,7 +183,6 @@ function OneOffEvents({ data, store }) {
             ) : (
               <li key={id} className="recurring-item">
                 <span>
-                  <strong style={{ color: kidOf(ev.kidId)?.color }}>{kidOf(ev.kidId)?.name}</strong>{' '}
                   {formatDateDMY(ev.date)} {ev.time} – {ev.reason}
                 </span>
                 <span className="recurring-item-actions">
@@ -190,10 +209,10 @@ function OneOffEvents({ data, store }) {
 
       {adding ? (
         <OneOffEventForm
-          initial={{ kidId: KIDS[0].id, date: '', time: '16:00', reason: '' }}
+          initial={{ date: '', time: '16:00', reason: '' }}
           submitLabel="Hinzufügen"
           onSubmit={(value) => {
-            store.addOneOffEvent(value)
+            store.addOneOffEvent({ ...value, kidId: kid.id })
             setAdding(false)
           }}
           onCancel={() => setAdding(false)}
@@ -208,7 +227,6 @@ function OneOffEvents({ data, store }) {
 }
 
 function OneOffEventForm({ initial, submitLabel, onSubmit, onCancel }) {
-  const [kidId, setKidId] = useState(initial.kidId)
   const [date, setDate] = useState(initial.date)
   const [time, setTime] = useState(initial.time)
   const [reason, setReason] = useState(initial.reason)
@@ -216,23 +234,16 @@ function OneOffEventForm({ initial, submitLabel, onSubmit, onCancel }) {
   function submit() {
     const trimmed = reason.trim()
     if (!trimmed || !date || !time) return
-    onSubmit({ kidId, date, time, reason: trimmed })
+    onSubmit({ ...initial, date, time, reason: trimmed })
   }
 
   return (
     <div className="add-event-form">
       <div className="add-person-row">
-        <select value={kidId} onChange={(e) => setKidId(e.target.value)}>
-          {KIDS.map((k) => (
-            <option key={k.id} value={k.id}>
-              {k.name}
-            </option>
-          ))}
-        </select>
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        <TimeSelect value={time} onChange={setTime} />
       </div>
       <div className="add-person-row">
-        <TimeSelect value={time} onChange={setTime} />
         <input
           type="text"
           placeholder="Grund (z.B. Zahnarzt)"
