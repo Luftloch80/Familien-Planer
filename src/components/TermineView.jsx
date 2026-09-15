@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { HOLIDAYS } from '../lib/holidays.js'
 import { KIDS, WEEKDAYS } from '../data/kids.js'
 import TimeSelect from './TimeSelect.jsx'
@@ -37,6 +37,8 @@ export default function TermineView({ data, store, onOpenMonthOverview }) {
         <h2>Einmalige Termine</h2>
         <OneOffEvents data={data} store={store} />
       </section>
+
+      <GardeCalendar />
 
       <section className="settings-section">
         <h2>Monatsübersicht</h2>
@@ -292,5 +294,52 @@ function EventForm({ initial, submitLabel, onSubmit, onCancel }) {
         </button>
       </div>
     </div>
+  )
+}
+
+function formatIcsEventDate(iso, allDay) {
+  const d = new Date(iso)
+  const dateLabel = d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })
+  if (allDay) return dateLabel
+  const timeLabel = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+  return `${dateLabel} ${timeLabel}`
+}
+
+function GardeCalendar() {
+  const [state, setState] = useState({ loading: true, events: [], error: false })
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/ics')
+      .then((r) => r.json())
+      .then((json) => {
+        if (!cancelled) setState({ loading: false, events: json.events ?? [], error: false })
+      })
+      .catch(() => {
+        if (!cancelled) setState({ loading: false, events: [], error: true })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return (
+    <section className="settings-section">
+      <h2>Garde-Kalender</h2>
+      {state.loading && <p className="status-warn">Lade Termine…</p>}
+      {state.error && <p className="status-warn">Kalender konnte nicht geladen werden.</p>}
+      {!state.loading && !state.error && state.events.length === 0 && (
+        <p className="status-warn">Keine anstehenden Termine.</p>
+      )}
+      {state.events.length > 0 && (
+        <ul className="kid-schedule-summary">
+          {state.events.map((ev, i) => (
+            <li key={i}>
+              {formatIcsEventDate(ev.start, ev.allDay)} – {ev.title}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }
