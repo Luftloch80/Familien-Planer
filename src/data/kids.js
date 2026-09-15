@@ -31,7 +31,9 @@ export const KIDS = [
       referenceMonday: '2026-09-14',
       cycle: ['We', 'Ha', 'Ga'],
       overrides: {
-        Montag: { We: '13:10', Ha: '13:10', Ga: '12:25' },
+        // Ga (Montag): die 3.FS-Einheit "Ko" (Kochen?) ist noch nicht bestätigt,
+        // wird bis auf Weiteres nicht angenommen -> Schulschluss schon nach 2.FS.
+        Montag: { We: '13:10', Ha: '13:10', Ga: '11:35' },
         Mittwoch: { We: '11:35', Ha: '13:10', Ga: '13:10' },
         Donnerstag: { We: '13:10', Ha: '11:35', Ga: '13:10' },
       },
