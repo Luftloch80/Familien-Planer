@@ -14,7 +14,7 @@ export function resolvePickup(kid, date, data) {
   const assignment = data.assignments[key]
   const exception = data.exceptions[key]
 
-  const chosenKey = assignment?.option ?? 'regular'
+  const chosenKey = assignment?.option ?? kid.defaultOption ?? 'regular'
   const chosenOption = options.find((o) => o.key === chosenKey) ?? options[0]
 
   const time = exception?.time || chosenOption?.time || null

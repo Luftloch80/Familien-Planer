@@ -50,6 +50,7 @@ export const KIDS = [
       Freitag: { regular: '11:35' },
     },
     kernzeit: '13:10',
+    defaultOption: 'kernzeit',
   },
   {
     id: 'rosi',
@@ -64,6 +65,7 @@ export const KIDS = [
       Freitag: { regular: '12:25' },
     },
     kernzeit: '13:10',
+    defaultOption: 'kernzeit',
   },
 ]
 
@@ -121,7 +123,7 @@ export function pickupOptions(kid, weekday, date) {
   const rotationOverride = kid.rotation?.overrides?.[weekday]
 
   if (day.biweekly && date && isBiweeklyActiveWeek(date, day.biweekly.referenceMonday)) {
-    options.push({ key: 'regular', label: day.biweekly.label, time: day.biweekly.time })
+    options.push({ key: 'regular', label: 'Schulschluss', time: day.biweekly.time })
   } else if (rotationOverride && date) {
     const phase = rotationPhase(date, kid.rotation)
     options.push({ key: 'regular', label: 'Schulschluss', time: rotationOverride[phase] })
