@@ -88,6 +88,13 @@ export default function SettingsView({ data, store, synced }) {
                     </span>
                   ),
               )}
+              {kid.rotation && (
+                <span className="schedule-note">
+                  {' '}
+                  · {Object.keys(kid.rotation.overrides).join('/')} variieren im 3-Wochen-Rhythmus
+                  (Werken/Handarbeit/Gartenbau) – genaue Zeit siehe Heute-/Wochenansicht
+                </span>
+              )}
             </li>
           ))}
         </ul>

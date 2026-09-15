@@ -1,6 +1,7 @@
 // Abholzeiten Schuljahr 2026/27, Freie Waldorfschule Gutenhalde
-// Quelle: Stundenpläne der Kinder + Angaben der Eltern (Kernzeit-Anmeldung, AGs)
-import { startOfWeek } from '../lib/dates.js'
+// Quelle: Stundenpläne der Kinder + Angaben der Eltern (Kernzeit-Anmeldung, AGs, Rotation)
+import { startOfWeek, addDays } from '../lib/dates.js'
+import { isSchoolDay } from '../lib/holidays.js'
 
 export { WEEKDAYS } from '../lib/dates.js'
 
@@ -23,6 +24,18 @@ export const KIDS = [
       },
     },
     kernzeit: null,
+    // Handarbeit/Werken/Gartenbau im 3-Wochen-Rhythmus (diese Woche = Werken).
+    // Ändert an Mo/Mi/Do die Schulschluss-Zeit, je nachdem welche Gruppe dran ist.
+    // Ferienwochen zählen beim Weiterzählen des Rhythmus nicht mit.
+    rotation: {
+      referenceMonday: '2026-09-14',
+      cycle: ['We', 'Ha', 'Ga'],
+      overrides: {
+        Montag: { We: '13:10', Ha: '13:10', Ga: '12:25' },
+        Mittwoch: { We: '11:35', Ha: '12:25', Ga: '12:25' },
+        Donnerstag: { We: '13:10', Ha: '11:35', Ga: '13:10' },
+      },
+    },
   },
   {
     id: 'charlotte',
@@ -65,15 +78,53 @@ function isBiweeklyActiveWeek(date, referenceMondayISO) {
   return ((diffWeeks % 2) + 2) % 2 === 0
 }
 
+function isFullyHolidayWeek(monday) {
+  for (let i = 0; i < 5; i++) {
+    if (isSchoolDay(addDays(monday, i))) return false
+  }
+  return true
+}
+
+// Zählt aktive (nicht komplett in den Ferien liegende) Wochen zwischen zwei Montagen (a <= b).
+function countActiveWeeksBetween(a, b) {
+  let count = 0
+  let cur = new Date(a)
+  while (cur < b) {
+    if (!isFullyHolidayWeek(cur)) count++
+    cur = addDays(cur, 7)
+  }
+  return count
+}
+
+// Welche Phase eines mehrwöchigen Rhythmus an einem Datum aktiv ist.
+// Ferienwochen (komplett schulfrei) zählen beim Weiterschalten nicht mit.
+function rotationPhase(date, rotation) {
+  const targetMonday = startOfWeek(date)
+  const refMonday = startOfWeek(new Date(`${rotation.referenceMonday}T00:00:00`))
+  const count =
+    targetMonday >= refMonday
+      ? countActiveWeeksBetween(refMonday, targetMonday)
+      : -countActiveWeeksBetween(targetMonday, refMonday)
+  const n = rotation.cycle.length
+  const idx = ((count % n) + n) % n
+  return rotation.cycle[idx]
+}
+
 // Abhol-Optionen (Zeit + Bezeichnung) für ein Kind an einem konkreten Datum.
-// `date` wird für Regelungen gebraucht, die nicht jede Woche gleich sind (z.B. Chor alle 2 Wochen).
+// `date` wird für Regelungen gebraucht, die nicht jede Woche gleich sind
+// (z.B. Chor alle 2 Wochen, Handarbeit/Werken/Gartenbau im 3-Wochen-Rhythmus).
 export function pickupOptions(kid, weekday, date) {
   const day = kid.schedule[weekday]
   if (!day) return []
 
   const options = []
+  const rotationOverride = kid.rotation?.overrides?.[weekday]
+
   if (day.biweekly && date && isBiweeklyActiveWeek(date, day.biweekly.referenceMonday)) {
     options.push({ key: 'regular', label: day.biweekly.label, time: day.biweekly.time })
+  } else if (rotationOverride && date) {
+    const phase = rotationPhase(date, kid.rotation)
+    options.push({ key: 'regular', label: 'Schulschluss', time: rotationOverride[phase] })
   } else {
     options.push({ key: 'regular', label: 'Schulschluss', time: day.regular })
   }
