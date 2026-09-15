@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { KIDS } from '../data/kids.js'
 import { weekdayName, addDays, formatShort, isSameDate } from '../lib/dates.js'
-import { isSchoolDay, holidayLabel } from '../lib/holidays.js'
+import { isSchoolDay, holidayLabel, extraSchoolDayLabel } from '../lib/holidays.js'
 import { pickupTimeMatches, resolvePickup } from '../lib/pickup.js'
 import { FOOD_ORDER_URL } from '../data/kids.js'
 import KidDayCard from './KidDayCard.jsx'
@@ -40,8 +40,12 @@ export default function TodayView({ data, store }) {
   const isToday = isSameDate(target, today)
   const weekday = weekdayName(target)
   const holiday = holidayLabel(target)
+  const extra = extraSchoolDayLabel(target)
   const isSchool = isSchoolDay(target)
-  const matches = isSchool ? pickupTimeMatches(KIDS, target, data) : []
+  // Abholplan gibt es nur Mo-Fr - zusätzliche Schultage am Wochenende (z.B.
+  // Basar) sind zwar Schultage, aber ohne Abholoptionen für die Kinder.
+  const showPickup = isSchool && weekday
+  const matches = showPickup ? pickupTimeMatches(KIDS, target, data) : []
 
   return (
     <div className="view view-no-padding">
@@ -55,7 +59,7 @@ export default function TodayView({ data, store }) {
       </div>
 
       <div className="today-list view-header-padded">
-        {isSchool ? (
+        {showPickup ? (
           KIDS.map((kid, i) => (
             <KidDayCard
               key={kid.id}
@@ -67,7 +71,9 @@ export default function TodayView({ data, store }) {
             />
           ))
         ) : (
-          <p className="hint">{holiday ? `${holiday} – keine Schule.` : 'An diesem Tag ist keine Schule.'}</p>
+          <p className="hint">
+            {extra ?? (holiday ? `${holiday} – keine Schule.` : 'An diesem Tag ist keine Schule.')}
+          </p>
         )}
 
         <a

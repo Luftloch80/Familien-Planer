@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { KIDS } from '../data/kids.js'
 import { weekdayName, toISODate, isSameDate } from '../lib/dates.js'
-import { isSchoolDay, holidayLabel } from '../lib/holidays.js'
+import { isSchoolDay, holidayLabel, extraSchoolDayLabel } from '../lib/holidays.js'
 import { resolvePickup } from '../lib/pickup.js'
 
 const WEEKDAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
@@ -162,6 +162,8 @@ export default function CalendarView({ data }) {
               {selectedInfo.holiday ? `${selectedInfo.holiday} – keine Schule` : 'Kein Schultag'}
             </p>
           )}
+
+          {extraSchoolDayLabel(selectedDate) && <p className="hint">{extraSchoolDayLabel(selectedDate)}</p>}
 
           {selectedIsAway && <p className="status-warn">🧳 Unterwegs</p>}
           {selectedIsOrange && selectedIsFlightDay && <p className="status-warn">🟠 Umlauf beginnt heute (nach 09:00)</p>}
