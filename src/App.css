@@ -612,6 +612,22 @@
   font-weight: 700;
 }
 
+.calendar-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 4px 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.calendar-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 .calendar-cell-num {
   font-variant-numeric: tabular-nums;
   font-weight: 600;

@@ -151,6 +151,13 @@ export default function CalendarView({ data }) {
         </div>
       </section>
 
+      <p className="calendar-legend">
+        <span className="calendar-legend-dot" style={{ background: 'var(--home-bg)' }} />
+        Zu Hause
+        <span className="calendar-legend-dot" style={{ background: 'var(--flight-red-bg)' }} />
+        Flugtag
+      </p>
+
       {selectedInfo && (
         <section className="settings-section">
           <h2>
