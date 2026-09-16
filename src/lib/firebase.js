@@ -1,5 +1,10 @@
 import { initializeApp } from 'firebase/app'
-import { getFirestore, doc } from 'firebase/firestore'
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentSingleTabManager,
+  doc,
+} from 'firebase/firestore'
 
 const cfg = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -17,7 +22,15 @@ let familyDocRef = null
 
 if (isFirebaseConfigured) {
   const app = initializeApp(cfg)
-  db = getFirestore(app)
+  // Persistenter Offline-Cache (IndexedDB): Eingaben, die ohne Netzverbindung
+  // oder während eines kurzen Verbindungsabbruchs gemacht werden, landen erst
+  // lokal und werden automatisch nachsynchronisiert, sobald die Verbindung
+  // wieder da ist - sie überleben damit auch ein Neuladen der Seite oder ein
+  // Beenden der App im Hintergrund, statt nur im flüchtigen Arbeitsspeicher
+  // zu liegen und beim nächsten Laden verloren zu sein.
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentSingleTabManager() }),
+  })
   familyDocRef = doc(db, 'familienplaner', 'daten')
 }
 

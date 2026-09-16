@@ -89,7 +89,9 @@ export function useFamilyStore() {
         try {
           await setDoc(familyDocRef, nested, { mergeFields: [path] })
         } catch {
-          // weiterhin offline: lokaler Stand bleibt, nächster Schreibversuch holt es nach
+          // weiterhin offline: der lokale Stand (React-State + localStorage-
+          // Backup unten) bleibt erhalten, der nächste Schreibversuch holt
+          // es nach.
         }
       }
     }
@@ -99,7 +101,11 @@ export function useFamilyStore() {
     (updater, remotePath, remoteValue) => {
       setData((prev) => {
         const next = updater(prev ?? DEFAULT_DATA)
-        if (!isFirebaseConfigured) writeLocal(next)
+        // Immer als Backup lokal sichern, auch wenn Firestore konfiguriert
+        // ist: geht ein Schreibvorgang dorthin verloren (App wird offline
+        // beendet, bevor er den Server erreicht hat), bleibt der eingegebene
+        // Wert hier trotzdem nachvollziehbar statt komplett zu verschwinden.
+        writeLocal(next)
         return next
       })
       if (isFirebaseConfigured) persistField(remotePath, remoteValue)
