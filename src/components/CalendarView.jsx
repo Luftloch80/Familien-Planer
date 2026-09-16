@@ -105,6 +105,11 @@ export default function CalendarView({ data }) {
     month: '2-digit',
   })} – ${weekDays[6].toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}`
 
+  const periodDays = viewMode === 'week' ? weekDays : monthDays
+  const periodTermineDays = periodDays
+    .map((date) => ({ date, info: dayInfo(date, data) }))
+    .filter(({ info }) => info.hasExtras)
+
   const selectedDate = new Date(`${selectedISO}T00:00:00`)
   const selectedInfo = dayInfo(selectedDate, data)
   const selectedIsOrange = (data.orangeDates ?? []).includes(selectedInfo.dateISO)
@@ -251,46 +256,82 @@ export default function CalendarView({ data }) {
         Flugtag
       </p>
 
-      <section className="settings-section">
-        <h2>
-          {selectedDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit' })}
-        </h2>
+      {viewMode === 'day' ? (
+        <section className="settings-section">
+          <h2>
+            {selectedDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit' })}
+          </h2>
 
-        {!selectedInfo.school && (
-          <p className="status-warn">
-            {selectedInfo.holiday ? `${selectedInfo.holiday} – keine Schule` : 'Kein Schultag'}
-          </p>
-        )}
+          {!selectedInfo.school && (
+            <p className="status-warn">
+              {selectedInfo.holiday ? `${selectedInfo.holiday} – keine Schule` : 'Kein Schultag'}
+            </p>
+          )}
 
-        {extraSchoolDayLabel(selectedDate) && <p className="hint">{extraSchoolDayLabel(selectedDate)}</p>}
+          {extraSchoolDayLabel(selectedDate) && <p className="hint">{extraSchoolDayLabel(selectedDate)}</p>}
 
-        {selectedIsAway && <p className="status-warn">🧳 Unterwegs</p>}
-        {selectedIsOrange && selectedIsFlightDay && <p className="status-warn">🟠 Umlauf beginnt heute (nach 09:00)</p>}
-        {selectedIsOrange && !selectedIsFlightDay && (
-          <p className="status-warn">🟠 Früher Check-in am nächsten Tag (vor 09:00)</p>
-        )}
+          {selectedIsAway && <p className="status-warn">🧳 Unterwegs</p>}
+          {selectedIsOrange && selectedIsFlightDay && (
+            <p className="status-warn">🟠 Umlauf beginnt heute (nach 09:00)</p>
+          )}
+          {selectedIsOrange && !selectedIsFlightDay && (
+            <p className="status-warn">🟠 Früher Check-in am nächsten Tag (vor 09:00)</p>
+          )}
 
-        {selectedInfo.perKid.every((p) => p.recurring.length === 0 && p.oneOff.length === 0) ? (
-          <p className="status-warn">Keine Termine an diesem Tag.</p>
-        ) : (
-          selectedInfo.perKid.map(({ kid, recurring, oneOff }) => {
-            if (recurring.length === 0 && oneOff.length === 0) return null
-            return (
-              <div key={kid.id} className="calendar-day-kid">
-                <strong style={{ color: kid.color }}>{kid.name}</strong>
-                <ul className="kid-schedule-summary">
-                  {recurring.map((e, i) => (
-                    <li key={`r${i}`}>{eventLine(e.title, e.time, e.endTime)}</li>
-                  ))}
-                  {oneOff.map((e, i) => (
-                    <li key={`o${i}`}>{eventLine(e.reason, e.time, e.endTime)}</li>
-                  ))}
-                </ul>
+          {selectedInfo.perKid.every((p) => p.recurring.length === 0 && p.oneOff.length === 0) ? (
+            <p className="status-warn">Keine Termine an diesem Tag.</p>
+          ) : (
+            selectedInfo.perKid.map(({ kid, recurring, oneOff }) => {
+              if (recurring.length === 0 && oneOff.length === 0) return null
+              return (
+                <div key={kid.id} className="calendar-day-kid">
+                  <strong style={{ color: kid.color }}>{kid.name}</strong>
+                  <ul className="kid-schedule-summary">
+                    {recurring.map((e, i) => (
+                      <li key={`r${i}`}>{eventLine(e.title, e.time, e.endTime)}</li>
+                    ))}
+                    {oneOff.map((e, i) => (
+                      <li key={`o${i}`}>{eventLine(e.reason, e.time, e.endTime)}</li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            })
+          )}
+        </section>
+      ) : (
+        <section className="settings-section">
+          <h2>Termine {viewMode === 'month' ? monthLabel : weekLabel}</h2>
+
+          {periodTermineDays.length === 0 ? (
+            <p className="status-warn">Keine Termine in diesem Zeitraum.</p>
+          ) : (
+            periodTermineDays.map(({ date, info }) => (
+              <div key={info.dateISO} className="calendar-day-group">
+                <h3 className="calendar-day-group-date">
+                  {date.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}
+                </h3>
+                {info.perKid.map(({ kid, recurring, oneOff }) => {
+                  if (recurring.length === 0 && oneOff.length === 0) return null
+                  return (
+                    <div key={kid.id} className="calendar-day-kid">
+                      <strong style={{ color: kid.color }}>{kid.name}</strong>
+                      <ul className="kid-schedule-summary">
+                        {recurring.map((e, i) => (
+                          <li key={`r${i}`}>{eventLine(e.title, e.time, e.endTime)}</li>
+                        ))}
+                        {oneOff.map((e, i) => (
+                          <li key={`o${i}`}>{eventLine(e.reason, e.time, e.endTime)}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )
+                })}
               </div>
-            )
-          })
-        )}
-      </section>
+            ))
+          )}
+        </section>
+      )}
     </div>
   )
 }
