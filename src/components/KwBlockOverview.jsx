@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { KIDS, pickupOptions } from '../data/kids.js'
-import { weekdayName, toISODate, startOfWeek, addDays } from '../lib/dates.js'
+import { weekdayName, toISODate, startOfWeek, addDays, isoWeekNumber } from '../lib/dates.js'
 import { isSchoolDay, holidayLabel } from '../lib/holidays.js'
 
 // Baut aus Titel + optionaler Start-/Enduhrzeit eine Anzeigezeile, z.B.
@@ -57,16 +57,6 @@ function buildRows(days, kids, data) {
     })
     return { dateLabel, cells, isWeekend: !weekday, duty: dutyLabel(dateISO, data) }
   })
-}
-
-function isoWeekNumber(date) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-  const dayNum = (d.getUTCDay() + 6) % 7
-  d.setUTCDate(d.getUTCDate() - dayNum + 3)
-  const firstThursday = new Date(Date.UTC(d.getUTCFullYear(), 0, 4))
-  const firstThursdayDayNum = (firstThursday.getUTCDay() + 6) % 7
-  firstThursday.setUTCDate(firstThursday.getUTCDate() - firstThursdayDayNum + 3)
-  return 1 + Math.round((d - firstThursday) / (7 * 86400000))
 }
 
 // Höchstens 3 Zeilen pro Zelle, sonst "+N weitere" - so bleibt die

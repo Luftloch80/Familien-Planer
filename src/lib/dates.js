@@ -39,3 +39,13 @@ export function formatShort(date) {
 export function isSameDate(a, b) {
   return toISODate(a) === toISODate(b)
 }
+
+export function isoWeekNumber(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dayNum = (d.getUTCDay() + 6) % 7
+  d.setUTCDate(d.getUTCDate() - dayNum + 3)
+  const firstThursday = new Date(Date.UTC(d.getUTCFullYear(), 0, 4))
+  const firstThursdayDayNum = (firstThursday.getUTCDay() + 6) % 7
+  firstThursday.setUTCDate(firstThursday.getUTCDate() - firstThursdayDayNum + 3)
+  return 1 + Math.round((d - firstThursday) / (7 * 86400000))
+}

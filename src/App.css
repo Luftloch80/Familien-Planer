@@ -544,6 +544,32 @@
 }
 
 /* Kalender (Blockübersicht) */
+.calendar-mode-switch {
+  display: flex;
+  gap: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 3px;
+  margin-bottom: 12px;
+}
+
+.calendar-mode-btn {
+  flex: 1;
+  border: none;
+  background: none;
+  color: var(--text);
+  padding: 7px 0;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.calendar-mode-btn-active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
 .calendar-nav {
   justify-content: space-between;
   margin-bottom: 12px;
