@@ -144,8 +144,18 @@ export default function CalendarView({ data }) {
       .filter(Boolean)
       .join(' ')
 
+    function handleClick() {
+      setSelectedISO(info.dateISO)
+      // In Monat/Woche liegt die Tagesgruppe schon im DOM (unabhängig von
+      // der Auswahl) - direkt dorthin scrollen, kein Warten auf ein Rerender
+      // nötig. Hat der Tag keine Termine, gibt es kein Ziel -> kein Scroll.
+      if (viewMode === 'month' || viewMode === 'week') {
+        document.getElementById(`cal-termin-${info.dateISO}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }
+
     return (
-      <button key={info.dateISO} type="button" className={cellClass} onClick={() => setSelectedISO(info.dateISO)}>
+      <button key={info.dateISO} type="button" className={cellClass} onClick={handleClick}>
         <span className="calendar-cell-num">{date.getDate()}</span>
         {info.hasExtras && (
           <span className="calendar-cell-dots">
@@ -307,7 +317,7 @@ export default function CalendarView({ data }) {
             <p className="status-warn">Keine Termine in diesem Zeitraum.</p>
           ) : (
             periodTermineDays.map(({ date, info }) => (
-              <div key={info.dateISO} className="calendar-day-group">
+              <div key={info.dateISO} id={`cal-termin-${info.dateISO}`} className="calendar-day-group">
                 <h3 className="calendar-day-group-date">
                   {date.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}
                 </h3>
