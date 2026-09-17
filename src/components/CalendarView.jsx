@@ -114,10 +114,13 @@ export default function CalendarView({ data }) {
     month: '2-digit',
   })} – ${weekDays[6].toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}`
 
+  const todayISO = toISODate(now)
   const periodDays = viewMode === 'week' ? weekDays : monthDays
+  // Abgelaufene Tage raus - die Liste soll zeigen, was noch ansteht, nicht
+  // was in diesem Monat/dieser Woche schon vorbei ist.
   const periodTermineDays = periodDays
     .map((date) => ({ date, info: dayInfo(date, data) }))
-    .filter(({ info }) => info.hasExtras)
+    .filter(({ info }) => info.hasExtras && info.dateISO >= todayISO)
 
   const selectedDate = new Date(`${selectedISO}T00:00:00`)
   const selectedInfo = dayInfo(selectedDate, data)
