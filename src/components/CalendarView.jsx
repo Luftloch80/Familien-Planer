@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { KIDS } from '../data/kids.js'
 import { weekdayName, toISODate, isSameDate, startOfWeek, addDays, isoWeekNumber } from '../lib/dates.js'
 import { isSchoolDay, holidayLabel, extraSchoolDayLabel, feiertagLabel } from '../lib/holidays.js'
@@ -66,15 +66,6 @@ export default function CalendarView({ data }) {
       setMonthIndex(base.getMonth())
     }
   }
-
-  // In Monat/Woche gleich zum heutigen Tag in der Termine-Liste springen,
-  // nicht nur wenn man selbst einen Tag anklickt - so landet man sofort bei
-  // dem, was gerade ansteht, statt erst suchen zu müssen.
-  useEffect(() => {
-    if (viewMode !== 'month' && viewMode !== 'week') return
-    const todayISO = toISODate(new Date())
-    document.getElementById(`cal-termin-${todayISO}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, [viewMode])
 
   function changeMonth(delta) {
     let m = monthIndex + delta
