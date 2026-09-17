@@ -3,6 +3,7 @@ import { KIDS } from '../data/kids.js'
 import { weekdayName, addDays, formatShort, isSameDate } from '../lib/dates.js'
 import { isSchoolDay, holidayLabel, extraSchoolDayLabel, feiertagLabel } from '../lib/holidays.js'
 import { pickupTimeMatches, resolvePickup } from '../lib/pickup.js'
+import { useUpdateAvailable } from '../lib/useUpdateAvailable.js'
 import { FOOD_ORDER_URL } from '../data/kids.js'
 import KidDayCard from './KidDayCard.jsx'
 import DayScroller from './DayScroller.jsx'
@@ -46,6 +47,7 @@ export default function TodayView({ data, store }) {
   // Basar) sind zwar Schultage, aber ohne Abholoptionen für die Kinder.
   const showPickup = isSchool && weekday
   const matches = showPickup ? pickupTimeMatches(KIDS, target, data) : []
+  const updateAvailable = useUpdateAvailable()
 
   return (
     <div className="view view-no-padding">
@@ -84,6 +86,12 @@ export default function TodayView({ data, store }) {
         >
           🍽️ Cantinorant
         </a>
+
+        {updateAvailable && (
+          <p className="update-banner">
+            🔄 Neue Version verfügbar – bitte die App einmal schließen und wieder öffnen.
+          </p>
+        )}
       </div>
     </div>
   )
