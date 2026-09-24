@@ -636,6 +636,10 @@
   background: linear-gradient(90deg, var(--home-bg) 50%, var(--flight-red-bg) 50%);
 }
 
+.calendar-cell-landing {
+  background: linear-gradient(90deg, var(--flight-red-bg) 50%, var(--home-bg) 50%);
+}
+
 .calendar-cell-red {
   background: var(--flight-red-bg);
 }

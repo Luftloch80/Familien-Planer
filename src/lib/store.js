@@ -14,6 +14,7 @@ const DEFAULT_DATA = {
   flightDates: [],
   orangeDates: [],
   awayDates: [],
+  landingDates: [],
 }
 
 function readLocal() {
