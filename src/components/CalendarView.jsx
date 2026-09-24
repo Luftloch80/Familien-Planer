@@ -115,26 +115,26 @@ export default function CalendarView({ data }) {
 
   const selectedDate = new Date(`${selectedISO}T00:00:00`)
   const selectedInfo = dayInfo(selectedDate, data)
-  const selectedIsOrange = (data.orangeDates ?? []).includes(selectedInfo.dateISO)
-  const selectedIsAway = (data.awayDates ?? []).includes(selectedInfo.dateISO)
-  const selectedIsFlightDay = (data.flightDates ?? []).includes(selectedInfo.dateISO)
-  const selectedIsLanding = (data.landingDates ?? []).includes(selectedInfo.dateISO)
 
   function renderDayCell(date) {
     const info = dayInfo(date, data)
     const isToday = isSameDate(date, now)
     const isSelected = info.dateISO === selectedISO
-    const isFlightDay = (data.flightDates ?? []).includes(info.dateISO)
-    const isOrange = (data.orangeDates ?? []).includes(info.dateISO)
-    const isAway = (data.awayDates ?? []).includes(info.dateISO)
+    // Flug-Farben (zu Hause/rot/orange/Landung) gibt's nur in der
+    // Monatsansicht - Tag und Woche sollen sich rein auf Termine
+    // konzentrieren, keine Fluginformationen.
+    const showFlightColors = viewMode === 'month'
+    const isFlightDay = showFlightColors && (data.flightDates ?? []).includes(info.dateISO)
+    const isOrange = showFlightColors && (data.orangeDates ?? []).includes(info.dateISO)
+    const isAway = showFlightColors && (data.awayDates ?? []).includes(info.dateISO)
     // Landung: letzter Flug des Tages kommt zurück nach EDDF - der Rest des
     // Tages ist schon zu Hause, statt den ganzen Tag rot zu zeigen.
-    const isLanding = (data.landingDates ?? []).includes(info.dateISO)
+    const isLanding = showFlightColors && (data.landingDates ?? []).includes(info.dateISO)
     // Grün ist der Normalfall (zu Hause): alles außer Flugtagen, dem
     // Orange-Hinweis (früher Check-in morgen oder Umlauf-Start nach
     // 09:00 heute) und bekannten Layover-Tagen (awayDates) gilt als
     // Zuhause-Tag, auch ohne explizite Daten.
-    const isHome = !isFlightDay && !isOrange && !isAway
+    const isHome = showFlightColors && !isFlightDay && !isOrange && !isAway
     // Rot: reine Flugtage (nicht orange, nicht Landetag) und Layover-Tage
     // ohne eigenen Flug (awayDates) - beides Tage, an denen man nicht zu
     // Hause ist. Landetage bekommen stattdessen ihre eigene halb-rot/-grüne
@@ -268,12 +268,14 @@ export default function CalendarView({ data }) {
         )}
       </section>
 
-      <p className="calendar-legend">
-        <span className="calendar-legend-dot" style={{ background: 'var(--home-bg)' }} />
-        Zu Hause
-        <span className="calendar-legend-dot" style={{ background: 'var(--flight-red-bg)' }} />
-        Flugtag
-      </p>
+      {viewMode === 'month' && (
+        <p className="calendar-legend">
+          <span className="calendar-legend-dot" style={{ background: 'var(--home-bg)' }} />
+          Zu Hause
+          <span className="calendar-legend-dot" style={{ background: 'var(--flight-red-bg)' }} />
+          Flugtag
+        </p>
+      )}
 
       {viewMode === 'day' ? (
         <section className="settings-section">
@@ -288,15 +290,6 @@ export default function CalendarView({ data }) {
           )}
 
           {extraSchoolDayLabel(selectedDate) && <p className="hint">{extraSchoolDayLabel(selectedDate)}</p>}
-
-          {selectedIsAway && <p className="status-warn">🧳 Unterwegs</p>}
-          {selectedIsOrange && selectedIsFlightDay && (
-            <p className="status-warn">🟠 Umlauf beginnt heute (nach 09:00)</p>
-          )}
-          {selectedIsOrange && !selectedIsFlightDay && (
-            <p className="status-warn">🟠 Früher Check-in am nächsten Tag (vor 09:00)</p>
-          )}
-          {selectedIsLanding && <p className="status-warn">🏠 Landung heute – ab dann zu Hause</p>}
 
           {selectedInfo.perKid.every((p) => p.recurring.length === 0 && p.oneOff.length === 0) ? (
             <p className="status-warn">Keine Termine an diesem Tag.</p>
