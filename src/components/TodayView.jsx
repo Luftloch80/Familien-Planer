@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { KIDS } from '../data/kids.js'
-import { weekdayName, addDays, formatShort, isSameDate } from '../lib/dates.js'
+import { weekdayName, addDays, isSameDate } from '../lib/dates.js'
 import { isSchoolDay, holidayLabel, extraSchoolDayLabel, feiertagLabel } from '../lib/holidays.js'
 import { pickupTimeMatches, resolvePickup } from '../lib/pickup.js'
 import { useUpdateAvailable } from '../lib/useUpdateAvailable.js'
@@ -55,9 +55,6 @@ export default function TodayView({ data, store }) {
 
       <div className="view-header view-header-padded">
         <h1>{isToday ? 'Heute' : weekday ?? 'Wochenende'}</h1>
-        <p className="subtitle">
-          {weekday ?? target.toLocaleDateString('de-DE', { weekday: 'long' })}, {formatShort(target)}
-        </p>
       </div>
 
       <div className="today-list view-header-padded">

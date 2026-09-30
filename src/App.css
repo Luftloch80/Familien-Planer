@@ -633,11 +633,23 @@
 }
 
 .calendar-cell-early {
-  background: linear-gradient(90deg, var(--home-bg) 50%, var(--flight-red-bg) 50%);
+  background: linear-gradient(
+    90deg,
+    var(--home-bg) calc(50% - 1.5px),
+    var(--text) calc(50% - 1.5px),
+    var(--text) calc(50% + 1.5px),
+    var(--flight-red-bg) calc(50% + 1.5px)
+  );
 }
 
 .calendar-cell-landing {
-  background: linear-gradient(90deg, var(--flight-red-bg) 50%, var(--home-bg) 50%);
+  background: linear-gradient(
+    90deg,
+    var(--flight-red-bg) calc(50% - 1.5px),
+    var(--text) calc(50% - 1.5px),
+    var(--text) calc(50% + 1.5px),
+    var(--home-bg) calc(50% + 1.5px)
+  );
 }
 
 .calendar-cell-red {
