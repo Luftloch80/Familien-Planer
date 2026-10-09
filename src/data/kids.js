@@ -19,11 +19,11 @@ export const KIDS = [
       Dienstag: { regular: '13:10' },
       Mittwoch: { regular: '11:35' },
       Donnerstag: { regular: '13:10' },
-      // Chor ist keine wählbare Option, sondern findet alle 2 Wochen statt
-      // (diese Woche = Chor-Woche, ab 14.09.2026).
+      // Standard ist jetzt 15:30, nur alle 2 Wochen (gleicher Rhythmus wie
+      // vorher Chor, ab 14.09.2026) ist schon um 13:10 Schluss.
       Freitag: {
-        regular: '13:10',
-        biweekly: { label: 'Chor', time: '15:30', referenceMonday: '2026-09-14' },
+        regular: '15:30',
+        biweekly: { label: 'Früher Schluss', time: '13:10', referenceMonday: '2026-09-14' },
       },
     },
     kernzeit: null,
