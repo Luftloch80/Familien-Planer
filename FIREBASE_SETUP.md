@@ -41,23 +41,13 @@ eigenen Handy denselben, live aktualisierten Stand.
 
 In den Einstellungen der App zeigt ein grüner Haken, sobald die Verbindung steht.
 
-## 4. Sicherheit (empfohlen, sobald es läuft)
+## 4. Sicherheit (wichtig: Testmodus läuft nach 30 Tagen ab!)
 
-Der Testmodus erlaubt jedem mit der Projekt-ID Lese-/Schreibzugriff. Für ein privates
-Familientool reicht das meist aus, da die ID nicht öffentlich einsehbar ist. Wer es
-etwas absichern möchte, kann in Firestore unter "Regeln" folgendes eintragen, damit nur
-auf das eine erwartete Dokument zugegriffen werden kann:
-
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /familienplaner/daten {
-      allow read, write: if true;
-    }
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-```
+Der Testmodus erlaubt zwar jedem mit der Projekt-ID Lese-/Schreibzugriff, aber nur
+**befristet für 30 Tage** - danach lehnt Firestore automatisch ALLE Anfragen ab (nicht
+nur ungesicherte), die App wäre also komplett offline. Deshalb möglichst bald durch
+dauerhafte Regeln ersetzen, die nur auf das eine erwartete Dokument zugreifen lassen
+(ohne Ablaufdatum). Die Regeln liegen bereits im Repo unter `firestore.rules` - in der
+Firebase-Konsole unter Firestore Database → Regeln den Inhalt dieser Datei einfügen und
+"Veröffentlichen" klicken (oder mit installierter Firebase-CLI: `firebase deploy --only
+firestore:rules`, Projekt ist in `.firebaserc` hinterlegt).

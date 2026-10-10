@@ -1,0 +1,19 @@
+rules_version = '2';
+
+// Die App hat kein Login - alle Familienmitglieder teilen sich denselben
+// Zugriff auf genau ein Dokument. Echte Authentifizierung gibt es bewusst
+// nicht (siehe FIREBASE_SETUP.md), daher ist der Schutz hier "nur dieses
+// eine erwartete Dokument ist erreichbar, alles andere ist zu" statt
+// nutzerbezogener Regeln. Wichtig: KEIN Ablaufdatum (anders als die
+// Test-Modus-Default-Regeln), sonst werden nach 30 Tagen wieder alle
+// Anfragen abgelehnt.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /familienplaner/daten {
+      allow read, write: if true;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
