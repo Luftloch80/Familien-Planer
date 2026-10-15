@@ -1,9 +1,21 @@
-import { useEffect, useState, useCallback } from 'react'
-import { doc, onSnapshot, setDoc, updateDoc, deleteField } from 'firebase/firestore'
-import { db, familyDocRef, isFirebaseConfigured } from './firebase.js'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { toISODate } from './dates.js'
 
-const LOCAL_KEY = 'familienplaner-data'
+// Daten liegen als ein JSON-Dokument in MySQL/MariaDB auf dem Webspace und
+// werden über public/api/api.php gelesen und geschrieben.
+const API_URL = import.meta.env.VITE_API_URL || `${import.meta.env.BASE_URL}api/api.php`
+const POLL_MS = 5000
+
+// Letzter bekannter Serverstand ({rev, data}) - damit die App sofort und auch
+// offline mit den zuletzt gesehenen Daten startet.
+const CACHE_KEY = 'familienplaner-cache'
+// Noch nicht vom Server bestätigte Änderungen ([{path, value}]). Überleben ein
+// Neuladen oder Beenden der App und werden nachgesendet, sobald der Server
+// wieder erreichbar ist.
+const PENDING_KEY = 'familienplaner-pending'
+// Lokale Sicherung aus der Zeit vor der Server-Synchronisierung.
+const LEGACY_KEY = 'familienplaner-data'
+
 const DEFAULT_DATA = {
   people: ['Droste', 'Klein', 'Heyer', 'Sonstige'],
   assignments: {},
@@ -17,192 +29,184 @@ const DEFAULT_DATA = {
   landingDates: [],
 }
 
-function readLocal() {
+function readJSON(key, fallback) {
   try {
-    const raw = localStorage.getItem(LOCAL_KEY)
-    if (!raw) return DEFAULT_DATA
-    return { ...DEFAULT_DATA, ...JSON.parse(raw) }
+    const raw = localStorage.getItem(key)
+    return raw ? JSON.parse(raw) : fallback
   } catch {
-    return DEFAULT_DATA
+    return fallback
   }
 }
 
-function writeLocal(data) {
-  localStorage.setItem(LOCAL_KEY, JSON.stringify(data))
+function writeJSON(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // Speicher voll oder gesperrt: dann eben nur im Arbeitsspeicher
+  }
+}
+
+// Setzt (oder löscht bei value === null) das Feld an einem Punkt-Pfad, ohne
+// das Ausgangsobjekt zu verändern. Gleiche Semantik wie api.php.
+function applyOp(doc, path, value) {
+  const parts = path.split('.')
+  const root = { ...doc }
+  let node = root
+  for (let i = 0; i < parts.length - 1; i++) {
+    const child = node[parts[i]]
+    if (child === null || typeof child !== 'object' || Array.isArray(child)) {
+      if (value === null) return root
+      node[parts[i]] = {}
+    } else {
+      node[parts[i]] = { ...child }
+    }
+    node = node[parts[i]]
+  }
+  const last = parts[parts.length - 1]
+  if (value === null) delete node[last]
+  else node[last] = value
+  return root
+}
+
+function withPending(serverData, pending) {
+  let doc = serverData
+  for (const op of pending) doc = applyOp(doc, op.path, op.value)
+  return { ...DEFAULT_DATA, ...doc }
 }
 
 export function assignmentKey(dateISO, kidId) {
   return `${dateISO}|${kidId}`
 }
 
-// Liefert {data, ready, synced, setAssignment, clearAssignment, setException, clearException, setPeople}
+// Liefert {data, ready, synced, setAssignment, clearAssignment, setException, clearException, setPeople, ...}
 export function useFamilyStore() {
-  const [data, setData] = useState(isFirebaseConfigured ? null : readLocal())
-  const [ready, setReady] = useState(!isFirebaseConfigured)
+  const [initial] = useState(() => {
+    const cache = readJSON(CACHE_KEY, null)
+    const pending = readJSON(PENDING_KEY, [])
+    const base = cache ? cache.data : readJSON(LEGACY_KEY, {})
+    return { cache, pending, data: withPending(base, pending) }
+  })
+  const serverRef = useRef(initial.cache)
+  const pendingRef = useRef(initial.pending)
+  const busyRef = useRef(false)
+
+  const [data, setData] = useState(initial.data)
+  const [ready, setReady] = useState(Boolean(initial.cache))
+  const [synced, setSynced] = useState(false)
+
+  const recompute = useCallback(() => {
+    const base = serverRef.current?.data ?? readJSON(LEGACY_KEY, {})
+    setData(withPending(base, pendingRef.current))
+  }, [])
+
+  const acceptServer = useCallback(
+    (result) => {
+      // Ältere Antworten (z. B. ein langsamer Abruf, der von einem Schreib-
+      // vorgang überholt wurde) dürfen einen neueren Stand nicht überschreiben.
+      if (serverRef.current && result.rev < serverRef.current.rev) return
+      serverRef.current = { rev: result.rev, data: result.data }
+      writeJSON(CACHE_KEY, serverRef.current)
+      recompute()
+    },
+    [recompute],
+  )
+
+  // Sendet ausstehende Änderungen bzw. holt den aktuellen Stand.
+  const sync = useCallback(async function run() {
+    if (busyRef.current) return
+    busyRef.current = true
+    let ok = false
+    try {
+      const sending = pendingRef.current.slice()
+      let result
+      if (sending.length > 0) {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ops: sending }),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        result = await res.json()
+        // Während der Anfrage neu hinzugekommene Änderungen bleiben stehen
+        pendingRef.current = pendingRef.current.slice(sending.length)
+        writeJSON(PENDING_KEY, pendingRef.current)
+      } else {
+        const since = serverRef.current?.rev ?? -1
+        const res = await fetch(`${API_URL}?since=${since}`, { cache: 'no-store' })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        result = await res.json()
+      }
+      if (!result.unchanged) acceptServer(result)
+      ok = true
+    } catch {
+      // Offline oder Server nicht erreichbar: lokal weiterarbeiten, der
+      // nächste Durchlauf (spätestens nach POLL_MS) versucht es erneut.
+    } finally {
+      busyRef.current = false
+      setSynced(ok)
+      setReady(true)
+    }
+    // Was während der Anfrage eingegeben wurde, gleich hinterherschicken
+    if (ok && pendingRef.current.length > 0) run()
+  }, [acceptServer])
 
   useEffect(() => {
-    if (!isFirebaseConfigured) return
-    const unsub = onSnapshot(
-      familyDocRef,
-      (snap) => {
-        // Nie ungefragt das ganze Dokument (neu) anlegen: ein leerer/fehlender
-        // Snapshot kann auch nur eine leere Offline-Cache-Ansicht sein, obwohl
-        // auf dem Server längst echte Daten liegen. Ein setDoc(DEFAULT_DATA)
-        // hier hat genau das schon mehrfach gelöscht. Anlegen passiert nur
-        // noch gezielt über persistField, wenn tatsächlich etwas gespeichert wird.
-        if (snap.exists()) {
-          setData({ ...DEFAULT_DATA, ...snap.data() })
-        } else {
-          setData(DEFAULT_DATA)
-        }
-        setReady(true)
-      },
-      () => {
-        // Verbindung fehlgeschlagen -> lokal weiterarbeiten
-        setData(readLocal())
-        setReady(true)
-      },
-    )
-    return unsub
-  }, [])
-
-  const persistField = useCallback(async (path, value) => {
-    if (isFirebaseConfigured && db) {
-      // null bedeutet hier "Feld löschen" - Firestore würde ein einfaches
-      // null aber nur als Nullwert speichern statt das Feld zu entfernen,
-      // was beim nächsten Laden zu kaputten (null) Einträgen führen würde.
-      const writeValue = value === null ? deleteField() : value
-      try {
-        await updateDoc(familyDocRef, { [path]: writeValue })
-      } catch {
-        // updateDoc schlägt fehl, wenn das Dokument noch gar nicht existiert.
-        // setDoc mit mergeFields schreibt garantiert NUR dieses eine Feld -
-        // egal ob das Dokument neu angelegt oder schon voller anderer Daten
-        // ist, nichts anderes wird angefasst oder überschrieben.
-        const nested = {}
-        const parts = path.split('.')
-        let cur = nested
-        for (let i = 0; i < parts.length - 1; i++) {
-          cur[parts[i]] = {}
-          cur = cur[parts[i]]
-        }
-        cur[parts[parts.length - 1]] = writeValue
-        try {
-          await setDoc(familyDocRef, nested, { mergeFields: [path] })
-        } catch {
-          // weiterhin offline: der lokale Stand (React-State + localStorage-
-          // Backup unten) bleibt erhalten, der nächste Schreibversuch holt
-          // es nach.
-        }
-      }
+    const tick = () => {
+      if (document.visibilityState === 'visible') sync()
     }
-  }, [])
+    sync()
+    const timer = setInterval(tick, POLL_MS)
+    document.addEventListener('visibilitychange', tick)
+    window.addEventListener('online', tick)
+    window.addEventListener('focus', tick)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', tick)
+      window.removeEventListener('online', tick)
+      window.removeEventListener('focus', tick)
+    }
+  }, [sync])
 
-  const updateLocalAndMaybeRemote = useCallback(
-    (updater, remotePath, remoteValue) => {
-      setData((prev) => {
-        const next = updater(prev ?? DEFAULT_DATA)
-        // Immer als Backup lokal sichern, auch wenn Firestore konfiguriert
-        // ist: geht ein Schreibvorgang dorthin verloren (App wird offline
-        // beendet, bevor er den Server erreicht hat), bleibt der eingegebene
-        // Wert hier trotzdem nachvollziehbar statt komplett zu verschwinden.
-        writeLocal(next)
-        return next
-      })
-      if (isFirebaseConfigured) persistField(remotePath, remoteValue)
+  const write = useCallback(
+    (path, value) => {
+      pendingRef.current = [...pendingRef.current, { path, value }]
+      writeJSON(PENDING_KEY, pendingRef.current)
+      recompute()
+      sync()
     },
-    [persistField],
+    [recompute, sync],
   )
 
   const setAssignment = useCallback(
-    (dateISO, kidId, value) => {
-      const key = assignmentKey(dateISO, kidId)
-      updateLocalAndMaybeRemote(
-        (prev) => ({ ...prev, assignments: { ...prev.assignments, [key]: value } }),
-        `assignments.${key}`,
-        value,
-      )
-    },
-    [updateLocalAndMaybeRemote],
+    (dateISO, kidId, value) => write(`assignments.${assignmentKey(dateISO, kidId)}`, value),
+    [write],
   )
 
   const clearAssignment = useCallback(
-    (dateISO, kidId) => {
-      const key = assignmentKey(dateISO, kidId)
-      updateLocalAndMaybeRemote(
-        (prev) => {
-          const next = { ...prev.assignments }
-          delete next[key]
-          return { ...prev, assignments: next }
-        },
-        `assignments.${key}`,
-        null,
-      )
-    },
-    [updateLocalAndMaybeRemote],
+    (dateISO, kidId) => write(`assignments.${assignmentKey(dateISO, kidId)}`, null),
+    [write],
   )
 
   const setException = useCallback(
-    (dateISO, kidId, value) => {
-      const key = assignmentKey(dateISO, kidId)
-      updateLocalAndMaybeRemote(
-        (prev) => ({ ...prev, exceptions: { ...prev.exceptions, [key]: value } }),
-        `exceptions.${key}`,
-        value,
-      )
-    },
-    [updateLocalAndMaybeRemote],
+    (dateISO, kidId, value) => write(`exceptions.${assignmentKey(dateISO, kidId)}`, value),
+    [write],
   )
 
   const clearException = useCallback(
-    (dateISO, kidId) => {
-      const key = assignmentKey(dateISO, kidId)
-      updateLocalAndMaybeRemote(
-        (prev) => {
-          const next = { ...prev.exceptions }
-          delete next[key]
-          return { ...prev, exceptions: next }
-        },
-        `exceptions.${key}`,
-        null,
-      )
-    },
-    [updateLocalAndMaybeRemote],
+    (dateISO, kidId) => write(`exceptions.${assignmentKey(dateISO, kidId)}`, null),
+    [write],
   )
 
-  const setPeople = useCallback(
-    (people) => {
-      updateLocalAndMaybeRemote((prev) => ({ ...prev, people }), 'people', people)
-    },
-    [updateLocalAndMaybeRemote],
-  )
+  const setPeople = useCallback((people) => write('people', people), [write])
 
   const setCredential = useCallback(
-    (kidId, credential) => {
-      updateLocalAndMaybeRemote(
-        (prev) => ({ ...prev, credentials: { ...prev.credentials, [kidId]: credential } }),
-        `credentials.${kidId}`,
-        credential,
-      )
-    },
-    [updateLocalAndMaybeRemote],
+    (kidId, credential) => write(`credentials.${kidId}`, credential),
+    [write],
   )
 
   const setRecurringEvent = useCallback(
-    (kidId, id, event) => {
-      updateLocalAndMaybeRemote(
-        (prev) => ({
-          ...prev,
-          recurringEvents: {
-            ...prev.recurringEvents,
-            [kidId]: { ...prev.recurringEvents?.[kidId], [id]: event },
-          },
-        }),
-        `recurringEvents.${kidId}.${id}`,
-        event,
-      )
-    },
-    [updateLocalAndMaybeRemote],
+    (kidId, id, event) => write(`recurringEvents.${kidId}.${id}`, event),
+    [write],
   )
 
   const addRecurringEvent = useCallback(
@@ -214,30 +218,11 @@ export function useFamilyStore() {
   )
 
   const removeRecurringEvent = useCallback(
-    (kidId, id) => {
-      updateLocalAndMaybeRemote(
-        (prev) => {
-          const kidEvents = { ...prev.recurringEvents?.[kidId] }
-          delete kidEvents[id]
-          return { ...prev, recurringEvents: { ...prev.recurringEvents, [kidId]: kidEvents } }
-        },
-        `recurringEvents.${kidId}.${id}`,
-        null,
-      )
-    },
-    [updateLocalAndMaybeRemote],
+    (kidId, id) => write(`recurringEvents.${kidId}.${id}`, null),
+    [write],
   )
 
-  const setOneOffEvent = useCallback(
-    (id, event) => {
-      updateLocalAndMaybeRemote(
-        (prev) => ({ ...prev, oneOffEvents: { ...prev.oneOffEvents, [id]: event } }),
-        `oneOffEvents.${id}`,
-        event,
-      )
-    },
-    [updateLocalAndMaybeRemote],
-  )
+  const setOneOffEvent = useCallback((id, event) => write(`oneOffEvents.${id}`, event), [write])
 
   const addOneOffEvent = useCallback(
     (event) => {
@@ -247,20 +232,7 @@ export function useFamilyStore() {
     [setOneOffEvent],
   )
 
-  const removeOneOffEvent = useCallback(
-    (id) => {
-      updateLocalAndMaybeRemote(
-        (prev) => {
-          const next = { ...prev.oneOffEvents }
-          delete next[id]
-          return { ...prev, oneOffEvents: next }
-        },
-        `oneOffEvents.${id}`,
-        null,
-      )
-    },
-    [updateLocalAndMaybeRemote],
-  )
+  const removeOneOffEvent = useCallback((id) => write(`oneOffEvents.${id}`, null), [write])
 
   // Abgelaufene einmalige Termine räumen sich von selbst auf, sobald ihr
   // (End-)Datum in der Vergangenheit liegt - keine manuelle Pflege nötig.
@@ -275,9 +247,9 @@ export function useFamilyStore() {
   }, [ready, data, removeOneOffEvent])
 
   return {
-    data: data ?? DEFAULT_DATA,
+    data,
     ready,
-    synced: isFirebaseConfigured,
+    synced,
     setAssignment,
     clearAssignment,
     setException,

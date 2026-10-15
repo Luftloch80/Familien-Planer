@@ -20,16 +20,12 @@ npm run dev
 
 ## Geräte-Synchronisierung
 
-Standardmäßig werden Änderungen nur lokal im Browser gespeichert. Für eine
-Synchronisierung zwischen mehreren Geräten (z.B. den Handys beider Elternteile)
-siehe [FIREBASE_SETUP.md](./FIREBASE_SETUP.md).
+Die Daten liegen in einer MySQL/MariaDB-Datenbank auf dem Webspace und werden über
+`public/api/api.php` gelesen und geschrieben. Alle Geräte sehen denselben Stand
+(Abgleich alle 5 Sekunden); ohne Netz wird lokal weitergearbeitet und später
+nachgesendet. Bei `npm run dev` ohne Server arbeitet die App nur lokal, außer
+`VITE_API_URL` zeigt auf eine laufende Schnittstelle (siehe `.env.example`).
 
 ## Build & Deployment
 
-```bash
-npm run build
-```
-
-Erzeugt einen statischen `dist/`-Ordner, der z.B. auf Vercel, Netlify oder
-GitHub Pages gehostet werden kann. Bei Nutzung der Firebase-Synchronisierung
-müssen die `VITE_FIREBASE_*`-Umgebungsvariablen beim Hosting-Anbieter hinterlegt werden.
+Siehe [DEPLOYMENT.md](./DEPLOYMENT.md) (Strato-Subdomain per GitHub Actions).

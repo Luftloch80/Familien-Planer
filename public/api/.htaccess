@@ -1,0 +1,4 @@
+# Zugangsdaten nie direkt ausliefern
+<Files "config.php">
+  Require all denied
+</Files>

@@ -22,15 +22,24 @@ jobs:
 
       - run: npm ci
 
-      - name: Build
-        run: npm run build
+      - run: npm run build
+
+      - name: Datenbank-Zugangsdaten für api.php
         env:
-          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          DB_HOST: ${{ secrets.STRATO_DB_HOST }}
+          DB_PORT: ${{ secrets.STRATO_DB_PORT }}
+          DB_NAME: ${{ secrets.STRATO_DB_NAME }}
+          DB_USER: ${{ secrets.STRATO_DB_USER }}
+          DB_PASSWORD: ${{ secrets.STRATO_DB_PASSWORD }}
+        run: |
+          php -r 'echo "<?php\nreturn " . var_export([
+            "host" => getenv("DB_HOST"),
+            "port" => getenv("DB_PORT") ?: "",
+            "name" => getenv("DB_NAME"),
+            "user" => getenv("DB_USER"),
+            "password" => getenv("DB_PASSWORD"),
+          ], true) . ";\n";' > dist/api/config.php
+          php -l dist/api/config.php
 
       - name: Per SFTP hochladen
         env:
@@ -47,3 +56,17 @@ jobs:
             mkdir -p -f \"$REMOTE_DIR\";
             mirror -R --verbose --parallel=4 dist/ \"$REMOTE_DIR\"
           "
+
+      # Nur beim ersten Mal wirksam: übernimmt die alten Firebase-Daten, solange
+      # die neue Datenbank noch leer ist, und tut danach nichts mehr.
+      - name: Daten aus Firebase übernehmen
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          SITE_URL: ${{ secrets.STRATO_SITE_URL }}
+        run: |
+          if [ -z "$FIREBASE_PROJECT_ID" ] || [ -z "$SITE_URL" ]; then
+            echo "VITE_FIREBASE_PROJECT_ID oder STRATO_SITE_URL fehlt - übersprungen."
+            exit 0
+          fi
+          node scripts/migrate-from-firebase.mjs
