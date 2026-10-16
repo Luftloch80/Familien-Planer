@@ -1,0 +1,61 @@
+name: Strato prüfen
+
+# Nur von Hand starten: zeigt DNS, Zertifikate, HTTP-Antworten und den
+# Inhalt des Webspaces, um Probleme mit Domain/Subdomain zu finden.
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    env:
+      SITE_URL: ${{ secrets.STRATO_SITE_URL }}
+      SFTP_HOST: ${{ secrets.STRATO_SFTP_HOST }}
+      SFTP_USER: ${{ secrets.STRATO_SFTP_USER }}
+      SFTP_PASSWORD: ${{ secrets.STRATO_SFTP_PASSWORD }}
+      REMOTE_DIR: ${{ secrets.STRATO_REMOTE_DIR }}
+    steps:
+      - name: Konfiguration (ohne Passwörter)
+        run: |
+          # Mit Leerzeichen getrennt ausgeben, damit GitHub die Werte nicht als *** maskiert
+          echo "SITE_URL:   $(echo "$SITE_URL" | sed 's/./& /g')"
+          echo "REMOTE_DIR: $(echo "$REMOTE_DIR" | sed 's/./& /g')"
+
+      - name: DNS
+        run: |
+          for h in luftloch.com www.luftloch.com familienplaner.luftloch.com; do
+            echo "== $h"
+            dig +short A "$h"; dig +short AAAA "$h"; dig +short CNAME "$h"
+          done
+
+      - name: Zertifikate
+        run: |
+          for h in luftloch.com familienplaner.luftloch.com; do
+            echo "== $h"
+            echo | timeout 15 openssl s_client -connect "$h:443" -servername "$h" 2>&1 \
+              | grep -E "subject=|issuer=|verify return|alert|errno|Verification" | head -5 || true
+            echo | timeout 15 openssl s_client -connect "$h:443" -servername "$h" 2>/dev/null \
+              | openssl x509 -noout -ext subjectAltName 2>/dev/null || true
+          done
+
+      - name: HTTP-Antworten
+        run: |
+          for u in http://luftloch.com/ https://luftloch.com/ \
+                   http://familienplaner.luftloch.com/ https://familienplaner.luftloch.com/ \
+                   https://familienplaner.luftloch.com/api/api.php https://luftloch.com/api/api.php; do
+            echo "== $u"
+            curl -sS -m 15 -o /tmp/body -w "HTTP %{http_code} -> %{redirect_url}\n" "$u" || true
+            head -c 200 /tmp/body 2>/dev/null; echo
+          done
+
+      - name: Webspace-Inhalt
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq lftp >/dev/null
+          lftp -c "
+            set sftp:auto-confirm yes;
+            open -u \"$SFTP_USER\",\"$SFTP_PASSWORD\" sftp://$SFTP_HOST;
+            echo '== pwd'; pwd;
+            echo '== /'; cls -l /;
+            echo '== Zielverzeichnis'; cls -l \"$REMOTE_DIR\";
+            echo '== Alle index.html (2 Ebenen)'; find -d 3 / | grep -E 'index\.html|api\.php' || true
+          "
