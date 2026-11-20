@@ -68,6 +68,11 @@ Von Hand: `FIREBASE_PROJECT_ID=… FIREBASE_API_KEY=… SITE_URL=https://… nod
 
 ## Lernhilfe (`lernhilfe/`)
 
+**Aktueller Stand:** Die Fotoerkennung ist ausgeschaltet (`FOTOS_AKTIV = false` in
+`lernhilfe/js/app.js`, `FOTOERKENNUNG: 'false'` im Workflow). Neue Themen aus Fotos
+werden als Einträge in `lernhilfe/js/data-themen.js` gepflegt und auf `main` gepusht.
+Zum Einschalten beide Schalter auf `true` setzen und die Secrets unten eintragen.
+
 Statische Seite (HTML/CSS/JS) plus eine kleine PHP-Schnittstelle
 (`lernhilfe/api/api.php`) für die Fotoerkennung. Bei jedem Push auf `main`, der
 etwas in `lernhilfe/` ändert, installiert `.github/workflows/deploy-lernhilfe.yml`
