@@ -18,10 +18,14 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      # Fotoerkennung (PHP-Schnittstelle in lernhilfe/api) mit hochladen? Braucht ANTHROPIC_API_KEY.
+      FOTOERKENNUNG: 'false'
     steps:
       - uses: actions/checkout@v4
 
       - name: PHP-Bibliotheken installieren
+        if: env.FOTOERKENNUNG == 'true'
         working-directory: lernhilfe/api
         run: |
           composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
@@ -30,6 +34,7 @@ jobs:
           find vendor -name .git -type d -prune -exec rm -rf {} +
 
       - name: Zugangsdaten für api.php
+        if: env.FOTOERKENNUNG == 'true'
         env:
           DB_HOST: ${{ secrets.STRATO_DB_HOST }}
           DB_PORT: ${{ secrets.STRATO_DB_PORT }}
@@ -67,6 +72,14 @@ jobs:
             set net:max-retries 3;
             open -u \"$SFTP_USER\",\"$SFTP_PASSWORD\" sftp://$SFTP_HOST;
             mkdir -p -f \"$REMOTE_DIR\";
-            mirror -R --verbose --parallel=4 --exclude-glob api/vendor/ lernhilfe/ \"$REMOTE_DIR\";
-            mirror -R --parallel=8 --ignore-time lernhilfe/api/vendor/ \"$REMOTE_DIR/api/vendor\"
+            mirror -R --verbose --parallel=4 --exclude-glob api/ lernhilfe/ \"$REMOTE_DIR\"
           "
+          if [ "$FOTOERKENNUNG" = "true" ]; then
+            lftp -c "
+              set sftp:auto-confirm yes;
+              set net:max-retries 3;
+              open -u \"$SFTP_USER\",\"$SFTP_PASSWORD\" sftp://$SFTP_HOST;
+              mirror -R --verbose --parallel=4 --exclude-glob vendor/ lernhilfe/api/ \"$REMOTE_DIR/api\";
+              mirror -R --parallel=8 --ignore-time lernhilfe/api/vendor/ \"$REMOTE_DIR/api/vendor\"
+            "
+          fi

@@ -170,6 +170,8 @@
     la: { label: 'Latein' },
   };
   const API = 'api/api.php';
+  // Fotoerkennung (braucht API-Schlüssel auf dem Server) – vorerst aus
+  const FOTOS_AKTIV = false;
   let remote = [];
   let apiOk = null;
   let busy = false;
@@ -183,6 +185,7 @@
     try { localStorage.setItem('lernhilfe:themen', JSON.stringify(remote)); } catch (e) { /* egal */ }
   }
   async function loadRemote() {
+    if (!FOTOS_AKTIV) { renderSide(); return; }
     try {
       const r = await fetch(API + '?action=list', { cache: 'no-store' });
       if (!r.ok) throw new Error(String(r.status));
@@ -293,12 +296,12 @@
   function topicsOf(fach) {
     const out = [];
     if (L[fach] && ORDER.includes(fach)) out.push({ subj: L[fach], title: BUILTIN_TITLE[fach], builtin: true });
-    remote.filter((t) => t.fach === fach).forEach((t) => out.push({ subj: topicSubj(t), title: t.titel, t }));
+    alleThemen().filter((t) => t.fach === fach).forEach((t) => out.push({ subj: topicSubj(t), title: t.titel, t }));
     return out;
   }
   function faecherList() {
     const set = new Set(ORDER);
-    remote.forEach((t) => set.add(t.fach));
+    alleThemen().forEach((t) => set.add(t.fach));
     return Object.keys(FAECHER).filter((f) => set.has(f));
   }
 
@@ -324,7 +327,7 @@
     if (currentFach && !list.includes(currentFach)) currentFach = '';
     const here = activeRoute || location.hash;
     side.innerHTML = `
-      <a class="side-photo ${!here || here === '#/' ? 'active' : ''}" href="#/">📷 Neue Fotos</a>
+      <a class="side-photo ${!here || here === '#/' ? 'active' : ''}" href="#/">${FOTOS_AKTIV ? '📷 Neue Fotos' : '🏠 Übersicht'}</a>
       <label class="side-label" for="fachSel">Fach</label>
       <select id="fachSel">
         <option value="">– Fach wählen –</option>
@@ -359,7 +362,7 @@
       return renderPrint(parts[1], parts[2] || '-');
     }
     if (parts[0] === 't' && parts[1]) {
-      const t = remote.find((x) => String(x.id) === parts[1]);
+      const t = alleThemen().find((x) => String(x.id) === parts[1]);
       if (!t) {
         renderSide();
         app.innerHTML = apiOk === null ? '<p class="muted">Lade …</p>' : '<div class="card"><h2>Thema nicht gefunden</h2><p>Vielleicht wurde es gelöscht.</p><a class="btn" href="#/">Zur Startseite</a></div>';
@@ -371,7 +374,7 @@
       subj = L[parts[0]];
       tabPart = parts[1];
     }
-    if (!subj) { renderSide('#/'); return renderFotos(); }
+    if (!subj) { renderSide('#/'); return FOTOS_AKTIV ? renderFotos() : renderStart(); }
     currentFach = subj.fach;
     store.prefs.fach = currentFach; save();
     renderSide();
@@ -542,7 +545,7 @@
         </div>
         <div class="topic-list">${g.topics.map((x) => topicCard(x)).join('')}</div>
       </section>`).join('') || '<p class="muted">Noch keine Themen.</p>'}
-      <a class="btn" href="#/">📷 Neue Fotos zu ${esc(fachName(fach))} hinzufügen</a>`;
+      ${FOTOS_AKTIV ? `<a class="btn" href="#/">📷 Neue Fotos zu ${esc(fachName(fach))} hinzufügen</a>` : ''}`;
   }
   function topicCard(x) {
     const p = progressOf(x.subj);
@@ -554,6 +557,36 @@
       <span class="progress"><span style="width:${Math.round(p.pct * 100)}%"></span></span>
       <span class="muted small">${p.text || 'Noch nicht geübt'}</span>
     </a>`;
+  }
+
+  // Themen aus der Datei data-themen.js (fest im Repo) plus Themen aus der Datenbank
+  function alleThemen() {
+    return (L.themen || []).map((t) => Object.assign({ static: true }, t)).concat(remote);
+  }
+
+  // ---------- Startseite: Übersicht ----------
+  function renderStart() {
+    document.title = 'Lernhilfe';
+    document.body.dataset.subject = '';
+    const neu = alleThemen().filter((t) => t.updated_at)
+      .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at))).slice(0, 4)
+      .map((t) => ({ subj: topicSubj(t), title: t.titel, t }));
+    app.innerHTML = `
+      <section class="hero small-hero">
+        <h1>Lernhilfe</h1>
+        <p>Wähle links ein Fach. Pro Epoche kannst du ein Lernheft als PDF drucken.</p>
+      </section>
+      <div class="subjects">${faecherList().map((f) => {
+        const eps = epochenOf(f);
+        const n = eps.reduce((k, g) => k + g.topics.length, 0);
+        return `<a class="subject-card" data-s="${f}" href="#/f/${f}">
+          <span class="subject-icon" aria-hidden="true">${fachIcon(f)}</span>
+          <span class="subject-name">${esc(fachName(f))}</span>
+          <span class="subject-sub">${eps.map((g) => esc(g.name || 'Fachunterricht')).join(' · ')}</span>
+          <span class="subject-meta"><span>${n} ${n === 1 ? 'Thema' : 'Themen'}</span></span>
+        </a>`;
+      }).join('')}</div>
+      ${neu.length ? `<section><h2 style="margin-top:24px">Zuletzt hinzugefügt</h2><div class="topic-list">${neu.map(topicCard).join('')}</div></section>` : ''}`;
   }
 
   // ---------- Startseite: Fotos ----------
@@ -740,14 +773,15 @@
         `<a role="tab" href="${subj.route}/${id}" class="${id === tab ? 'active' : ''}" aria-selected="${id === tab}">${label}</a>`).join('')}</div>
       <div id="view"></div>
       <footer class="topic-foot">
-        ${t ? `<form class="epoche-form" id="epForm">
+        ${t && !t.static ? `<form class="epoche-form" id="epForm">
           <label for="epIn">Epoche</label>
           <input type="text" id="epIn" list="epList" value="${esc((t.data && t.data.epoche) || '')}" placeholder="z. B. Geometrie" maxlength="100">
           <datalist id="epList">${epochenOf(subj.fach).filter((g) => g.name).map((g) => `<option value="${esc(g.name)}">`).join('')}</datalist>
           <button class="btn" type="submit">Speichern</button>
         </form>` : ''}
         <a class="btn" href="${printLink(subj.fach, epocheOf(t ? { t } : { builtin: true, subj }))}">🖨️ Lern-PDF dieser Epoche</a>
-        ${t ? `<p class="muted small">Aus ${verlauf.reduce((n, v) => n + (v.fotos || 0), 0)} Fotos erstellt${verlauf.length > 1 ? ` (${verlauf.length} Auswertungen)` : ''}.
+        ${t && t.static ? `<p class="muted small">Epoche: ${esc((t.data && t.data.epoche) || OHNE_EPOCHE)}</p>` : ''}
+        ${t && !t.static ? `<p class="muted small">Aus ${verlauf.reduce((n, v) => n + (v.fotos || 0), 0)} Fotos erstellt${verlauf.length > 1 ? ` (${verlauf.length} Auswertungen)` : ''}.
         <button type="button" class="link" id="delTopic">Thema löschen</button></p>` : ''}
       </footer>`;
     const view = document.getElementById('view');
