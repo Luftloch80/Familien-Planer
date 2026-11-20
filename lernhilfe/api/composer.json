@@ -1,0 +1,16 @@
+{
+    "name": "luftloch/lernhilfe-api",
+    "description": "Fotoerkennung und Themenspeicher für die Lernhilfe",
+    "type": "project",
+    "require": {
+        "php": ">=8.1",
+        "anthropic-ai/sdk": "^1.12",
+        "guzzlehttp/guzzle": "^7.9"
+    },
+    "config": {
+        "allow-plugins": {
+            "php-http/discovery": false
+        },
+        "optimize-autoloader": true
+    }
+}

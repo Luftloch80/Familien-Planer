@@ -68,11 +68,27 @@ Von Hand: `FIREBASE_PROJECT_ID=… FIREBASE_API_KEY=… SITE_URL=https://… nod
 
 ## Lernhilfe (`lernhilfe/`)
 
-Statische Seite ohne Build (HTML/CSS/JS, keine Datenbank). Bei jedem Push auf
-`main`, der etwas in `lernhilfe/` ändert, lädt `.github/workflows/deploy-lernhilfe.yml`
-den Ordner per SFTP nach `/lernhilfe` im Strato-Webspace (gleiche SFTP-Secrets
-wie oben). Anderes Zielverzeichnis: Secret `STRATO_LERNHILFE_DIR` setzen.
+Statische Seite (HTML/CSS/JS) plus eine kleine PHP-Schnittstelle
+(`lernhilfe/api/api.php`) für die Fotoerkennung. Bei jedem Push auf `main`, der
+etwas in `lernhilfe/` ändert, installiert `.github/workflows/deploy-lernhilfe.yml`
+die PHP-Bibliotheken (Composer), schreibt `api/config.php` und lädt alles per
+SFTP nach `/lernhilfe` im Strato-Webspace (gleiche SFTP-Secrets wie oben).
+Anderes Zielverzeichnis: Secret `STRATO_LERNHILFE_DIR` setzen.
+
+Zusätzliche Secrets:
+
+| Secret | Wert |
+| --- | --- |
+| `ANTHROPIC_API_KEY` | API-Schlüssel von console.anthropic.com (für die Fotoerkennung) |
+| `LERNHILFE_CODE` | Zugangscode, den man beim ersten Auswerten eingibt (empfohlen, sonst kann jeder mit dem Link auf deine Kosten Fotos auswerten lassen) |
+
+Die Themen aus den Fotos landen in der Tabelle `lernhilfe_themen` derselben
+Datenbank wie der Familienplaner (wird automatisch angelegt). Die Fotos selbst
+werden nicht gespeichert. Strato muss für die Domain PHP 8.1 oder neuer nutzen
+(Strato → Einstellungen → PHP-Version).
+
 Erreichbar ist die Seite über eine Domain/Subdomain, die bei Strato auf das
-Verzeichnis `/lernhilfe` zeigt (z. B. `lernhilfe.deine-domain.de`), oder als
-Unterordner einer Domain, die auf das Webspace-Hauptverzeichnis zeigt.
-Lokal ansehen: `lernhilfe/index.html` im Browser öffnen.
+Verzeichnis `/lernhilfe` zeigt (z. B. `lernhilfe.deine-domain.de`).
+
+Lokal testen: `cd lernhilfe/api && composer install`, eine `config.php` nach
+`config.example.php` anlegen und im Ordner `lernhilfe` `php -S localhost:8000` starten.

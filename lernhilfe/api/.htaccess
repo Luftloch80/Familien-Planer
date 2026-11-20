@@ -1,0 +1,5 @@
+# Zugangsdaten und Bibliotheken nie direkt ausliefern
+<FilesMatch "^(config\.php|composer\.(json|lock))$">
+  Require all denied
+</FilesMatch>
+RedirectMatch 404 /vendor/

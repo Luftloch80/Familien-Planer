@@ -21,6 +21,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: PHP-Bibliotheken installieren
+        working-directory: lernhilfe/api
+        run: |
+          composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+          # Tests und Beispiele der Bibliotheken werden auf dem Server nicht gebraucht
+          rm -rf vendor/anthropic-ai/sdk/{tests,examples,fixtures,scripts}
+          find vendor -name .git -type d -prune -exec rm -rf {} +
+
+      - name: Zugangsdaten für api.php
+        env:
+          DB_HOST: ${{ secrets.STRATO_DB_HOST }}
+          DB_PORT: ${{ secrets.STRATO_DB_PORT }}
+          DB_NAME: ${{ secrets.STRATO_DB_NAME }}
+          DB_USER: ${{ secrets.STRATO_DB_USER }}
+          DB_PASSWORD: ${{ secrets.STRATO_DB_PASSWORD }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          LERNHILFE_CODE: ${{ secrets.LERNHILFE_CODE }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then echo "::warning::Secret ANTHROPIC_API_KEY fehlt – Fotoerkennung funktioniert nicht."; fi
+          if [ -z "$LERNHILFE_CODE" ]; then echo "::warning::Secret LERNHILFE_CODE fehlt – jeder mit dem Link kann Fotos auswerten lassen."; fi
+          php -r 'echo "<?php\nreturn " . var_export([
+            "db" => [
+              "host" => getenv("DB_HOST"),
+              "port" => getenv("DB_PORT") ?: "",
+              "name" => getenv("DB_NAME"),
+              "user" => getenv("DB_USER"),
+              "password" => getenv("DB_PASSWORD"),
+            ],
+            "anthropic_key" => getenv("ANTHROPIC_API_KEY") ?: "",
+            "code" => getenv("LERNHILFE_CODE") ?: "",
+          ], true) . ";\n";' > lernhilfe/api/config.php
+          php -l lernhilfe/api/config.php
+
       - name: Per SFTP hochladen
         env:
           SFTP_HOST: ${{ secrets.STRATO_SFTP_HOST }}
@@ -34,5 +67,6 @@ jobs:
             set net:max-retries 3;
             open -u \"$SFTP_USER\",\"$SFTP_PASSWORD\" sftp://$SFTP_HOST;
             mkdir -p -f \"$REMOTE_DIR\";
-            mirror -R --verbose --parallel=4 lernhilfe/ \"$REMOTE_DIR\"
+            mirror -R --verbose --parallel=4 --exclude-glob api/vendor/ lernhilfe/ \"$REMOTE_DIR\";
+            mirror -R --parallel=8 --ignore-time lernhilfe/api/vendor/ \"$REMOTE_DIR/api/vendor\"
           "

@@ -100,6 +100,7 @@
     return !isNaN(v) && Math.abs(v - n) <= Math.max(1e-6, Math.abs(n) * 1e-6);
   };
   const fmtNum = (n) => L.trainer.fmt(n);
+  const deL = (subj) => subj.deLabel || 'Deutsch';
 
   // Vorlesen
   const canSpeak = 'speechSynthesis' in window;
@@ -111,9 +112,9 @@
     u.rate = 0.9;
     window.speechSynthesis.speak(u);
   }
-  const speakLang = (subj) => (subj.id === 'franz' ? 'fr-FR' : 'en-GB');
+  const speakLang = (subj) => subj.speakLang || (subj.id === 'franz' ? 'fr-FR' : subj.id === 'englisch' ? 'en-GB' : '');
   const speakBtn = (text, subj) =>
-    canSpeak ? `<button class="speak" type="button" data-speak="${esc(text)}" data-lang="${speakLang(subj)}" aria-label="Vorlesen" title="Vorlesen">🔊</button>` : '';
+    canSpeak && speakLang(subj) ? `<button class="speak" type="button" data-speak="${esc(text)}" data-lang="${speakLang(subj)}" aria-label="Vorlesen" title="Vorlesen">🔊</button>` : '';
 
   document.addEventListener('click', (e) => {
     const b = e.target.closest('[data-speak]');
@@ -148,66 +149,454 @@
     return { done, total: subj.exercises.length };
   }
 
+  // ---------- Fächer & gespeicherte Themen ----------
+  const FAECHER = {
+    mathe: ['Mathe', '📐'], englisch: ['Englisch', '🇬🇧'], franz: ['Französisch', '🇫🇷'], deutsch: ['Deutsch', '📖'],
+    latein: ['Latein', '🏛️'], spanisch: ['Spanisch', '🇪🇸'], bio: ['Biologie', '🌱'], physik: ['Physik', '🔭'],
+    chemie: ['Chemie', '⚗️'], geschichte: ['Geschichte', '🏰'], erdkunde: ['Erdkunde', '🌍'], musik: ['Musik', '🎵'],
+    religion: ['Religion/Ethik', '🕊️'], sonstiges: ['Sonstiges', '📚'],
+  };
+  const fachName = (f) => (FAECHER[f] || FAECHER.sonstiges)[0];
+  const fachIcon = (f) => (FAECHER[f] || FAECHER.sonstiges)[1];
+  const BUILTIN_TITLE = {
+    mathe: 'Fläche, Volumen, Oberfläche, Einheiten',
+    englisch: 'Around the World in 80 Days – Kapitel 2',
+    franz: 'Chapitre 1–3 · Le passé récent',
+  };
+  const LANG = {
+    en: { label: 'English', speak: 'en-GB' },
+    fr: { label: 'Français', speak: 'fr-FR', accents: ['é', 'è', 'ê', 'à', 'â', 'ç', 'ù', 'û', 'î', 'ï', 'ô', 'ë', 'œ', '’'] },
+    es: { label: 'Español', speak: 'es-ES', accents: ['á', 'é', 'í', 'ó', 'ú', 'ñ', 'ü', '¿', '¡'] },
+    la: { label: 'Latein' },
+  };
+  const API = 'api/api.php';
+  let remote = [];
+  let apiOk = null;
+  let busy = false;
+  let photos = [];
+  let lastResult = null;
+  try { remote = JSON.parse(localStorage.getItem('lernhilfe:themen') || '[]') || []; } catch (e) { remote = []; }
+
+  function setRemote(list) {
+    remote = Array.isArray(list) ? list : [];
+    subjCache.clear();
+    try { localStorage.setItem('lernhilfe:themen', JSON.stringify(remote)); } catch (e) { /* egal */ }
+  }
+  async function loadRemote() {
+    try {
+      const r = await fetch(API + '?action=list', { cache: 'no-store' });
+      if (!r.ok) throw new Error(String(r.status));
+      const d = await r.json();
+      apiOk = true;
+      setRemote(d.themen);
+    } catch (e) {
+      apiOk = false;
+    }
+    const h = location.hash;
+    if (!busy && (!h || h === '#/' || h.startsWith('#/t/') || h.startsWith('#/f/'))) route(true);
+    else renderSide();
+  }
+
+  // Einfaches, sicheres Markdown (alles wird zuerst maskiert)
+  function md(src) {
+    const lines = String(src || '').replace(/\r/g, '').split('\n');
+    let out = '', list = null, para = [];
+    const inline = (s) => esc(s)
+      .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+      .replace(/(^|[^*\w])\*(?=\S)(.+?)\*(?!\w)/g, '$1<i>$2</i>')
+      .replace(/`(.+?)`/g, '<code>$1</code>');
+    const flushP = () => { if (para.length) { out += `<p>${para.map(inline).join('<br>')}</p>`; para = []; } };
+    const flushL = () => { if (list) { out += `</${list}>`; list = null; } };
+    const cells = (r) => r.replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+    const isSep = (r) => /^\|?[\s:|-]+\|?$/.test(r) && r.includes('-');
+    for (let i = 0; i < lines.length; i++) {
+      const t = lines[i].trim();
+      let m;
+      if (!t) { flushP(); flushL(); continue; }
+      if ((m = t.match(/^#{1,6}\s+(.*)/))) { flushP(); flushL(); out += `<h4>${inline(m[1])}</h4>`; continue; }
+      if (t.startsWith('|')) {
+        flushP(); flushL();
+        const rows = [];
+        while (i < lines.length && lines[i].trim().startsWith('|')) rows.push(lines[i++].trim());
+        i--;
+        let head = null, body = rows;
+        if (rows.length > 1 && isSep(rows[1])) { head = cells(rows[0]); body = rows.slice(2); }
+        out += '<div class="table-wrap"><table>' +
+          (head ? `<thead><tr>${head.map((c) => `<th>${inline(c)}</th>`).join('')}</tr></thead>` : '') +
+          `<tbody>${body.filter((r) => !isSep(r)).map((r) => `<tr>${cells(r).map((c) => `<td>${inline(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+        continue;
+      }
+      if ((m = t.match(/^[-*•]\s+(.*)/)) || (m = t.match(/^\d+[.)]\s+(.*)/))) {
+        flushP();
+        const type = /^\d/.test(t) ? 'ol' : 'ul';
+        if (list !== type) { flushL(); out += `<${type}>`; list = type; }
+        out += `<li>${inline(m[1])}</li>`;
+        continue;
+      }
+      if ((m = t.match(/^>\s?(.*)/))) { flushP(); flushL(); out += `<div class="merke">${inline(m[1])}</div>`; continue; }
+      flushL();
+      para.push(t);
+    }
+    flushP(); flushL();
+    return out;
+  }
+
+  const isNumStr = (s) => /^-?[\d\s., ]+$/.test(String(s).trim()) && /\d/.test(s);
+
+  // Gespeichertes Thema in dieselbe Form bringen wie die eingebauten Fächer
+  const subjCache = new Map();
+  function topicSubj(t) {
+    const key = t.id + '|' + t.updated_at;
+    if (subjCache.has(key)) return subjCache.get(key);
+    const d = t.data || {};
+    const lang = LANG[d.sprache] || null;
+    const voc = d.vokabeln || [];
+    const s = {
+      id: 't' + t.id,
+      remote: t,
+      fach: t.fach,
+      route: '#/t/' + t.id,
+      name: t.titel,
+      icon: fachIcon(t.fach),
+      subtitle: fachName(t.fach) + (d.zusammenfassung ? ' · ' + d.zusammenfassung : ''),
+      langLabel: lang ? lang.label : 'Begriff',
+      deLabel: lang ? 'Deutsch' : 'Bedeutung',
+      speakLang: lang && lang.speak,
+      accents: lang && lang.accents,
+      tips: lang
+        ? ['Vokabeln laut lesen und lernen.', 'Mit Karteikarten und Vokabeltest üben.', 'Grammatik lesen, dann die Übungen machen.']
+        : ['Erklärungen lesen.', 'Übungen machen und prüfen.', 'Fehler verbessern und nochmal prüfen.'],
+      grammarLabel: lang ? 'Grammatik' : 'Wissen',
+      vocabGroups: voc.length ? [{ title: 'Vokabeln', words: voc.map((v) => [v.begriff, v.bedeutung, v.erklaerung || '']) }] : [],
+      pitfalls: d.stolperfallen || [],
+      grammar: (d.grammatik || []).map((g) => ({ title: g.titel, html: md(g.inhalt) })),
+      exercises: (d.uebungen || []).map((u, i) => ({
+        id: 'u' + i,
+        title: u.titel,
+        intro: u.anleitung,
+        items: (u.aufgaben || []).map((a) => ({
+          q: String(a.frage || ''),
+          hint: a.hinweis,
+          sol: a.erklaerung,
+          a: (a.luecken || []).map((l) => {
+            const ls = (l.loesungen || []).filter((x) => String(x).trim());
+            if ((l.einheit || ls.every(isNumStr)) && ls.length && !isNaN(parseNum(ls[0]))) return { n: parseNum(ls[0]), u: l.einheit || '' };
+            return ls;
+          }),
+        })),
+      })),
+    };
+    subjCache.set(key, s);
+    return s;
+  }
+
+  function topicsOf(fach) {
+    const out = [];
+    if (L[fach] && ORDER.includes(fach)) out.push({ subj: L[fach], title: BUILTIN_TITLE[fach], builtin: true });
+    remote.filter((t) => t.fach === fach).forEach((t) => out.push({ subj: topicSubj(t), title: t.titel, t }));
+    return out;
+  }
+  function faecherList() {
+    const set = new Set(ORDER);
+    remote.forEach((t) => set.add(t.fach));
+    return Object.keys(FAECHER).filter((f) => set.has(f));
+  }
+
+  function progressOf(subj) {
+    const ex = exStats(subj);
+    let pct = ex.total ? ex.done / ex.total : 0, parts = [];
+    const hasVoc = subj.vocabGroups && subj.vocabGroups.length && allWords(subj).length;
+    if (hasVoc) {
+      const v = vocabStats(subj);
+      parts.push(`${v.known} / ${v.total} Vokabeln sicher`);
+      pct = ex.total ? (v.known / v.total + pct) / 2 : v.known / v.total;
+    }
+    if (ex.total) parts.push(`${ex.done} / ${ex.total} Übungen geschafft`);
+    return { pct, text: parts.join(' · ') };
+  }
+
+  // ---------- Seitenleiste ----------
+  let currentFach = store.prefs.fach || '';
+  function renderSide(activeRoute) {
+    const side = document.getElementById('side');
+    if (!side) return;
+    const list = faecherList();
+    if (currentFach && !list.includes(currentFach)) currentFach = '';
+    const topics = currentFach ? topicsOf(currentFach) : [];
+    const here = activeRoute || location.hash;
+    side.innerHTML = `
+      <a class="side-photo ${!here || here === '#/' ? 'active' : ''}" href="#/">📷 Neue Fotos</a>
+      <label class="side-label" for="fachSel">Fach</label>
+      <select id="fachSel">
+        <option value="">– Fach wählen –</option>
+        ${list.map((f) => `<option value="${f}" ${f === currentFach ? 'selected' : ''}>${fachIcon(f)} ${fachName(f)}</option>`).join('')}
+      </select>
+      ${currentFach ? `<nav class="side-topics" aria-label="Themen">
+        <a href="#/f/${currentFach}" class="${here === '#/f/' + currentFach ? 'active' : ''}">Alle Themen in ${esc(fachName(currentFach))}</a>
+        ${topics.map((x) => `<a href="${x.subj.route}" class="${here.startsWith(x.subj.route + '/') || here === x.subj.route ? 'active' : ''}">${esc(x.title)}${x.builtin ? '' : x.t.basis ? ' <span class="tag">Ergänzung</span>' : ''}</a>`).join('')}
+      </nav>` : ''}`;
+    side.querySelector('#fachSel').addEventListener('change', (e) => {
+      currentFach = e.target.value;
+      store.prefs.fach = currentFach; save();
+      location.hash = currentFach ? '#/f/' + currentFach : '#/';
+    });
+  }
+
   // ---------- Routing ----------
-  function route() {
+  function route(keepScroll) {
     const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
-    const subj = L[parts[0]];
-    window.scrollTo(0, 0);
-    if (!subj || !ORDER.includes(parts[0])) return renderHome();
+    if (keepScroll !== true) window.scrollTo(0, 0);
+    let subj = null, tabPart = null;
+    if (parts[0] === 'f' && parts[1]) {
+      currentFach = parts[1];
+      store.prefs.fach = currentFach; save();
+      renderSide();
+      return renderFach(parts[1]);
+    }
+    if (parts[0] === 't' && parts[1]) {
+      const t = remote.find((x) => String(x.id) === parts[1]);
+      if (!t) {
+        renderSide();
+        app.innerHTML = apiOk === null ? '<p class="muted">Lade …</p>' : '<div class="card"><h2>Thema nicht gefunden</h2><p>Vielleicht wurde es gelöscht.</p><a class="btn" href="#/">Zur Startseite</a></div>';
+        return;
+      }
+      subj = topicSubj(t);
+      tabPart = parts[2];
+    } else if (L[parts[0]] && ORDER.includes(parts[0])) {
+      subj = L[parts[0]];
+      tabPart = parts[1];
+    }
+    if (!subj) { renderSide('#/'); return renderFotos(); }
+    currentFach = subj.fach;
+    store.prefs.fach = currentFach; save();
+    renderSide();
     const tabs = tabsFor(subj);
-    const tab = tabs.find((t) => t[0] === parts[1]) ? parts[1] : tabs[0][0];
+    const tab = tabs.find((t) => t[0] === tabPart) ? tabPart : tabs[0][0];
     renderSubject(subj, tab, tabs);
   }
-  window.addEventListener('hashchange', route);
+  window.addEventListener('hashchange', () => route());
 
   function tabsFor(subj) {
     if (subj.id === 'mathe') return [['wissen', 'Wissen'], ['uebungen', 'Übungen'], ['training', 'Training']];
-    return [['vokabeln', 'Vokabeln'], ['karten', 'Karteikarten'], ['test', 'Vokabeltest'], ['grammatik', 'Grammatik'], ['uebungen', 'Übungen']];
+    const t = [];
+    if (subj.vocabGroups && subj.vocabGroups.some((g) => g.words.length)) t.push(['vokabeln', 'Vokabeln'], ['karten', 'Karteikarten'], ['test', 'Vokabeltest']);
+    if (subj.grammar && subj.grammar.length) t.push(['grammatik', subj.grammarLabel || 'Grammatik']);
+    if (subj.exercises && subj.exercises.length) t.push(['uebungen', 'Übungen']);
+    if (!t.length) t.push(['leer', 'Inhalt']);
+    return t;
   }
 
-  // ---------- Startseite ----------
-  function renderHome() {
+  // ---------- Fach-Übersicht ----------
+  function renderFach(fach) {
+    document.title = `${fachName(fach)} – Lernhilfe`;
+    document.body.dataset.subject = ORDER.includes(fach) ? fach : '';
+    const topics = topicsOf(fach);
+    app.innerHTML = `
+      <header class="subject-head">
+        <span class="subject-icon" aria-hidden="true">${fachIcon(fach)}</span>
+        <div><h1>${esc(fachName(fach))}</h1><p>${topics.length} ${topics.length === 1 ? 'Thema' : 'Themen'}</p></div>
+      </header>
+      <div class="topic-list">${topics.map((x) => topicCard(x)).join('') || '<p class="muted">Noch keine Themen.</p>'}</div>
+      <a class="btn" href="#/">📷 Neue Fotos zu ${esc(fachName(fach))} hinzufügen</a>`;
+  }
+  function topicCard(x) {
+    const p = progressOf(x.subj);
+    const d = x.t ? x.t.data || {} : null;
+    const when = x.t && x.t.updated_at ? new Date(String(x.t.updated_at).replace(' ', 'T')).toLocaleDateString('de-DE') : '';
+    return `<a class="topic-card" href="${x.subj.route}">
+      <span class="topic-title">${esc(x.title)}${x.t && x.t.basis ? ' <span class="tag">Ergänzung</span>' : ''}</span>
+      <span class="muted small">${x.builtin ? 'aus dem Lernheft' : `aus Fotos${when ? ' · zuletzt ' + when : ''}`}${d && d.zusammenfassung ? ' · ' + esc(d.zusammenfassung) : ''}</span>
+      <span class="progress"><span style="width:${Math.round(p.pct * 100)}%"></span></span>
+      <span class="muted small">${p.text || 'Noch nicht geübt'}</span>
+    </a>`;
+  }
+
+  // ---------- Startseite: Fotos ----------
+  function renderFotos() {
     document.title = 'Lernhilfe';
     document.body.dataset.subject = '';
-    const cards = ORDER.map((id) => {
-      const s = L[id];
-      const ex = exStats(s);
-      let meta = `<span>${ex.done} / ${ex.total} Übungen geschafft</span>`;
-      let pct = ex.total ? ex.done / ex.total : 0;
-      if (s.vocabGroups) {
-        const v = vocabStats(s);
-        meta = `<span>${v.known} / ${v.total} Vokabeln sicher</span>` + meta;
-        pct = (v.known / v.total + pct) / 2;
-      }
-      return `<a class="subject-card" data-s="${id}" href="#/${id}">
-        <span class="subject-icon" aria-hidden="true">${s.icon}</span>
-        <span class="subject-name">${s.name}</span>
-        <span class="subject-sub">${esc(s.subtitle)}</span>
-        <span class="progress"><span style="width:${Math.round(pct * 100)}%"></span></span>
-        <span class="subject-meta">${meta}</span>
-      </a>`;
-    }).join('');
+    const recent = remote.slice(0, 5).map((t) => ({ subj: topicSubj(t), title: t.titel, t }));
+    const r = lastResult;
+    let status = '';
+    if (busy) {
+      status = `<div class="busy"><span class="spinner" aria-hidden="true"></span><div><b>Fotos werden ausgewertet …</b><br><span class="muted small">Fach und Thema erkennen, Vokabeln, Erklärungen und Übungen erstellen. Das dauert meist 1–2 Minuten. <span id="elapsed"></span></span></div></div>`;
+    } else if (r && r.needCode) {
+      status = `<form class="code-form" id="codeForm"><p>${esc(r.error || 'Bitte den Zugangscode eingeben.')}</p>
+        <input type="password" id="codeIn" placeholder="Zugangscode" autocomplete="current-password" aria-label="Zugangscode">
+        <button class="btn primary" type="submit">Weiter</button></form>`;
+    } else if (r && r.error) {
+      status = `<div class="msg wrong">✘ ${esc(r.error)}</div>`;
+    } else if (r && r.ok === false) {
+      status = `<div class="msg almost">${esc(r.begruendung)}</div>`;
+    } else if (r && r.ok) {
+      const parts = [];
+      if (r.anzahl.vokabeln) parts.push(`${r.anzahl.vokabeln} Vokabeln`);
+      if (r.anzahl.grammatik) parts.push(`${r.anzahl.grammatik} Erklärungen`);
+      if (r.anzahl.uebungen) parts.push(`${r.anzahl.uebungen} Übungen`);
+      status = `<div class="result-card ${r.neu ? 'neu' : 'ergaenzung'}">
+        <div class="result-kind">${r.neu ? '✨ Neues Thema' : '➕ Ergänzung zu einem bekannten Thema'}</div>
+        <h3>${fachIcon(r.fach)} ${esc(r.fach_name)} · ${esc(r.titel)}</h3>
+        ${!r.neu && r.abschnitt && r.abschnitt !== r.titel ? `<p class="muted">Neuer Abschnitt: ${esc(r.abschnitt)}</p>` : ''}
+        <p>${esc(r.begruendung)}</p>
+        ${parts.length ? `<p class="muted small">Erstellt: ${parts.join(' · ')}</p>` : ''}
+        <a class="btn primary" href="#/t/${r.thema_id}">Jetzt lernen →</a>
+        ${r.basis ? ` <a class="btn" href="#/${esc(r.fach)}">Zum Lernheft</a>` : ''}
+      </div>`;
+    }
     app.innerHTML = `
-      <section class="hero">
-        <h1>Lernhilfe</h1>
-        <p>Vokabeln, Grammatik und Übungen zum Mitmachen – mit sofortiger Kontrolle.</p>
+      <section class="hero small-hero">
+        <h1>Neue Fotos</h1>
+        <p>Fotografiere Arbeitsblätter, Buchseiten oder Hefteinträge. Die Lernhilfe erkennt automatisch das Fach und ob es ein neues Thema ist – und macht daraus Vokabeln, Erklärungen und Übungen.</p>
       </section>
-      <div class="subjects">${cards}</div>`;
+      <section class="card photo-card">
+        ${apiOk === false ? '<div class="msg almost">Die Fotoerkennung ist gerade nicht erreichbar. Sie funktioniert nur, wenn die Seite auf dem Server läuft.</div>' : ''}
+        <div class="photo-buttons">
+          <label class="btn primary big-btn ${busy ? 'disabled' : ''}">📷 Foto aufnehmen<input class="vh" type="file" accept="image/*" capture="environment" id="camIn" ${busy ? 'disabled' : ''}></label>
+          <label class="btn big-btn ${busy ? 'disabled' : ''}">🖼️ Aus der Galerie<input class="vh" type="file" accept="image/*" multiple id="galIn" ${busy ? 'disabled' : ''}></label>
+        </div>
+        <div class="thumbs">${photos.map((p, i) => `<figure class="thumb"><img src="${p.url}" alt="Foto ${i + 1}">${busy ? '' : `<button type="button" class="thumb-x" data-rm="${i}" aria-label="Foto ${i + 1} entfernen">×</button>`}</figure>`).join('')}</div>
+        <p class="muted small">${photos.length ? `${photos.length} von ${MAX_PHOTOS} Fotos. ` : ''}Tipp: Mehrere Seiten zum selben Thema zusammen auswerten. Gerade von oben und bei gutem Licht fotografieren.</p>
+        <div class="actions"><button class="btn primary" id="go" ${!photos.length || busy || apiOk === false ? 'disabled' : ''}>${photos.length > 1 ? `${photos.length} Fotos auswerten` : 'Foto auswerten'}</button></div>
+        <div id="status" aria-live="polite">${status}</div>
+      </section>
+      ${recent.length ? `<section><h2>Zuletzt hinzugefügt</h2><div class="topic-list">${recent.map(topicCard).join('')}</div></section>` : ''}
+      <section><h2>Fächer</h2><div class="fach-grid">${faecherList().map((f) => `<a class="fach-chip" href="#/f/${f}"><span>${fachIcon(f)}</span>${esc(fachName(f))}<small>${topicsOf(f).length}</small></a>`).join('')}</div></section>`;
+
+    const add = (files) => {
+      for (const f of Array.from(files || [])) {
+        if (!f.type.startsWith('image/') && !/\.(heic|heif)$/i.test(f.name)) continue;
+        if (photos.length >= MAX_PHOTOS) break;
+        photos.push({ file: f, url: URL.createObjectURL(f) });
+      }
+      lastResult = null;
+      renderFotos();
+    };
+    app.querySelector('#camIn').addEventListener('change', (e) => add(e.target.files));
+    app.querySelector('#galIn').addEventListener('change', (e) => add(e.target.files));
+    app.querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', () => {
+      const [p] = photos.splice(+b.dataset.rm, 1);
+      URL.revokeObjectURL(p.url);
+      renderFotos();
+    }));
+    app.querySelector('#go').addEventListener('click', analyzePhotos);
+    const cf = app.querySelector('#codeForm');
+    if (cf) {
+      cf.querySelector('input').focus();
+      cf.addEventListener('submit', (e) => {
+        e.preventDefault();
+        store.prefs.code = cf.querySelector('input').value.trim(); save();
+        analyzePhotos();
+      });
+    }
+    if (busy) tickElapsed();
+  }
+  const MAX_PHOTOS = 8;
+  let busyStart = 0;
+  function tickElapsed() {
+    const el = document.getElementById('elapsed');
+    if (!el || !busy) return;
+    el.textContent = `(${Math.round((Date.now() - busyStart) / 1000)} s)`;
+    setTimeout(tickElapsed, 1000);
   }
 
-  // ---------- Fachseite ----------
+  async function shrink(file) {
+    const max = 1600;
+    let src;
+    try {
+      src = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    } catch (e) {
+      src = await new Promise((res, rej) => {
+        const i = new Image();
+        i.onload = () => res(i);
+        i.onerror = () => rej(new Error('Ein Foto konnte nicht gelesen werden.'));
+        i.src = URL.createObjectURL(file);
+      });
+    }
+    const w = src.width, h = src.height, f = Math.min(1, max / Math.max(w, h));
+    const c = document.createElement('canvas');
+    c.width = Math.round(w * f);
+    c.height = Math.round(h * f);
+    c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+    return { type: 'image/jpeg', data: c.toDataURL('image/jpeg', 0.85).split(',')[1] };
+  }
+
+  async function analyzePhotos() {
+    if (busy || !photos.length) return;
+    busy = true;
+    busyStart = Date.now();
+    lastResult = null;
+    if (location.hash && location.hash !== '#/') location.hash = '#/';
+    renderFotos();
+    try {
+      const images = [];
+      for (const p of photos) images.push(await shrink(p.file));
+      const r = await fetch(API + '?action=analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Lernhilfe-Code': store.prefs.code || '' },
+        body: JSON.stringify({ images }),
+      });
+      const d = await r.json().catch(() => ({ error: `Der Server hat nicht richtig geantwortet (${r.status}).` }));
+      if (r.status === 401) {
+        lastResult = { needCode: true, error: store.prefs.code ? 'Der Zugangscode stimmt nicht. Bitte nochmal eingeben.' : 'Bitte den Zugangscode eingeben.' };
+      } else if (!r.ok) {
+        lastResult = { error: d.error || `Fehler ${r.status}` };
+      } else {
+        if (d.themen) setRemote(d.themen);
+        lastResult = d;
+        if (d.ok) {
+          photos.forEach((p) => URL.revokeObjectURL(p.url));
+          photos = [];
+        }
+      }
+    } catch (e) {
+      lastResult = { error: (e && e.message && !/fetch/i.test(e.message)) ? e.message : 'Keine Verbindung zum Server. Bitte nochmal versuchen.' };
+    }
+    busy = false;
+    if (!location.hash || location.hash === '#/') { renderSide('#/'); renderFotos(); } else renderSide();
+  }
+
+  async function deleteTopic(subj) {
+    if (!confirm(`Thema „${subj.name}“ wirklich löschen?`)) return;
+    const send = () => fetch(API + '?action=delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Lernhilfe-Code': store.prefs.code || '' },
+      body: JSON.stringify({ id: subj.remote.id }),
+    });
+    try {
+      let r = await send();
+      if (r.status === 401) {
+        const c = prompt('Zugangscode:');
+        if (!c) return;
+        store.prefs.code = c.trim(); save();
+        r = await send();
+      }
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || r.status);
+      setRemote(d.themen);
+      location.hash = '#/f/' + subj.fach;
+    } catch (e) {
+      alert('Löschen hat nicht geklappt: ' + e.message);
+    }
+  }
+
+  // ---------- Themenseite ----------
   function renderSubject(subj, tab, tabs) {
     document.title = `${subj.name} – Lernhilfe`;
-    document.body.dataset.subject = subj.id;
+    document.body.dataset.subject = ORDER.includes(subj.fach) ? subj.fach : '';
+    const t = subj.remote;
+    const verlauf = t && t.data && t.data.verlauf ? t.data.verlauf : [];
     app.innerHTML = `
-      <nav class="crumbs"><a href="#/">← Alle Fächer</a></nav>
+      <nav class="crumbs"><a href="#/f/${subj.fach}">← ${esc(fachName(subj.fach))}</a></nav>
       <header class="subject-head">
         <span class="subject-icon" aria-hidden="true">${subj.icon}</span>
-        <div><h1>${subj.name}</h1><p>${esc(subj.subtitle)}</p></div>
+        <div><h1>${esc(subj.name)}</h1><p>${esc(subj.subtitle)}</p></div>
       </header>
       <div class="tabs" role="tablist">${tabs.map(([id, label]) =>
-        `<a role="tab" href="#/${subj.id}/${id}" class="${id === tab ? 'active' : ''}" aria-selected="${id === tab}">${label}</a>`).join('')}</div>
-      <div id="view"></div>`;
+        `<a role="tab" href="${subj.route}/${id}" class="${id === tab ? 'active' : ''}" aria-selected="${id === tab}">${label}</a>`).join('')}</div>
+      <div id="view"></div>
+      ${t ? `<footer class="topic-foot muted small">
+        Aus ${verlauf.reduce((n, v) => n + (v.fotos || 0), 0)} Fotos erstellt${verlauf.length > 1 ? ` (${verlauf.length} Auswertungen)` : ''}.
+        <button type="button" class="link" id="delTopic">Thema löschen</button></footer>` : ''}`;
     const view = document.getElementById('view');
     ({
       vokabeln: renderVocabList,
@@ -217,7 +606,10 @@
       wissen: renderGrammar,
       uebungen: renderExercises,
       training: renderTraining,
+      leer: (s, v) => { v.innerHTML = '<p class="muted">Zu diesem Thema gibt es noch keine Inhalte.</p>'; },
     })[tab](subj, view);
+    const del = document.getElementById('delTopic');
+    if (del) del.addEventListener('click', () => deleteTopic(subj));
     const active = app.querySelector('.tabs .active');
     if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest', inline: 'center' });
   }
@@ -230,14 +622,14 @@
   // ---------- Vokabelliste mit Abdeckfunktion ----------
   function renderVocabList(subj, view) {
     const cover = store.prefs.cover || 'none';
-    const isEn = subj.id === 'englisch';
+    const isEn = subj.id === 'englisch' || allWords(subj).some((w) => w.ex);
     view.innerHTML = `
       ${tipsBox(subj)}
       <div class="toolbar">
         <span class="label">Abdecken:</span>
         <div class="seg" id="cover">
           <button data-c="none">nichts</button>
-          <button data-c="de">Deutsch</button>
+          <button data-c="de">${deL(subj)}</button>
           <button data-c="fr">${subj.langLabel}</button>
         </div>
       </div>
@@ -246,7 +638,7 @@
         <section class="card">
           <h2>${esc(g.title)}</h2>
           <div class="table-wrap"><table class="vocab">
-            <thead><tr><th class="num">#</th><th>${subj.langLabel}</th>${isEn ? '<th class="hide-sm">Erklärung</th>' : ''}<th>Deutsch</th></tr></thead>
+            <thead><tr><th class="num">#</th><th>${subj.langLabel}</th>${isEn ? '<th class="hide-sm">Erklärung</th>' : ''}<th>${deL(subj)}</th></tr></thead>
             <tbody>${allWords(subj, gi).map((w) => `
               <tr>
                 <td class="num"><span class="dot b${boxOf(w)}" title="Lernstand"></span></td>
@@ -257,7 +649,7 @@
             </tbody>
           </table></div>
         </section>`).join('')}
-      <section class="card warn-card"><h2>Stolperfallen</h2><ul>${subj.pitfalls.map((p) => `<li>${p}</li>`).join('')}</ul></section>
+      ${subj.pitfalls && subj.pitfalls.length ? `<section class="card warn-card"><h2>Stolperfallen</h2><ul>${subj.pitfalls.map((p) => `<li>${subj.remote ? esc(p) : p}</li>`).join('')}</ul></section>` : ''}
       <p class="legend small muted"><span class="dot b0"></span> neu <span class="dot b1"></span> geübt <span class="dot b2"></span> sicher <span class="dot b4"></span> sitzt</p>`;
 
     function apply(c) {
@@ -284,8 +676,8 @@
       ? `<label>Kapitel <select id="sGroup"><option value="all">alle</option>${subj.vocabGroups.map((g, i) => `<option value="${i}">${esc(g.title)}</option>`).join('')}</select></label>` : '';
     return `<div class="settings card">
       <label>Richtung <select id="sDir">
-        <option value="fd">${subj.langLabel} → Deutsch</option>
-        <option value="df">Deutsch → ${subj.langLabel}</option>
+        <option value="fd">${subj.langLabel} → ${deL(subj)}</option>
+        <option value="df">${deL(subj)} → ${subj.langLabel}</option>
         <option value="mix">gemischt</option>
       </select></label>
       ${groups}
@@ -353,8 +745,8 @@
           <div class="progress-line"><span>${known} / ${total} gewusst</span><span class="progress"><span style="width:${(known / total) * 100}%"></span></span></div>
           <div class="flash" tabindex="0" role="button" aria-label="Karte umdrehen">
             <div class="flash-inner">
-              <div class="face front"><small>${w.dir === 'fd' ? subj.langLabel : 'Deutsch'}</small><div class="word">${esc(front)}</div>${w.dir === 'fd' ? speakBtn(w.fr, subj) : ''}<small class="muted">Tippen zum Umdrehen</small></div>
-              <div class="face back"><small>${w.dir === 'fd' ? 'Deutsch' : subj.langLabel}</small><div class="word">${esc(back)}</div>${w.ex ? `<div class="muted">${esc(w.ex)}</div>` : ''}${w.dir === 'df' ? speakBtn(w.fr, subj) : ''}</div>
+              <div class="face front"><small>${w.dir === 'fd' ? subj.langLabel : deL(subj)}</small><div class="word">${esc(front)}</div>${w.dir === 'fd' ? speakBtn(w.fr, subj) : ''}<small class="muted">Tippen zum Umdrehen</small></div>
+              <div class="face back"><small>${w.dir === 'fd' ? deL(subj) : subj.langLabel}</small><div class="word">${esc(back)}</div>${w.ex ? `<div class="muted">${esc(w.ex)}</div>` : ''}${w.dir === 'df' ? speakBtn(w.fr, subj) : ''}</div>
             </div>
           </div>
           <div class="rate" hidden>
@@ -421,7 +813,7 @@
         area.innerHTML = `
           <div class="progress-line"><span>Frage ${i + 1} / ${list.length} · ${right} richtig</span><span class="progress"><span style="width:${(i / list.length) * 100}%"></span></span></div>
           <form class="card quiz" autocomplete="off">
-            <small class="muted">Übersetze ins ${w.dir === 'fd' ? 'Deutsche' : (subj.id === 'franz' ? 'Französische' : 'Englische')}:</small>
+            <small class="muted">Gesucht: ${w.dir === 'fd' ? deL(subj) : subj.langLabel}</small>
             <div class="word">${esc(prompt)} ${w.dir === 'fd' ? speakBtn(w.fr, subj) : ''}</div>
             ${w.ex && w.dir === 'df' ? `<div class="muted small">Tipp: ${esc(w.ex)}</div>` : ''}
             <input type="text" class="answer" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Deine Antwort">
@@ -481,7 +873,9 @@
   function renderGrammar(subj, view) {
     view.innerHTML = (subj.id === 'mathe' ? tipsBox(subj) : '') +
       subj.grammar.map((g, i) => `<section class="card gram" id="g${i}"><h2>${esc(g.title)}</h2>${g.html}</section>`).join('') +
-      `<div class="next"><a class="btn primary" href="#/${subj.id}/uebungen">Weiter zu den Übungen →</a></div>`;
+      (subj.remote && subj.pitfalls.length && !allWords(subj).length
+        ? `<section class="card warn-card"><h2>Stolperfallen</h2><ul>${subj.pitfalls.map((p) => `<li>${esc(p)}</li>`).join('')}</ul></section>` : '') +
+      (subj.exercises && subj.exercises.length ? `<div class="next"><a class="btn primary" href="${subj.route}/uebungen">Weiter zu den Übungen →</a></div>` : '');
   }
 
   // ---------- Übungen ----------
@@ -670,5 +1064,7 @@
     route();
   });
 
+  ORDER.forEach((id) => { L[id].route = '#/' + id; L[id].fach = id; });
+  loadRemote();
   route();
 })();

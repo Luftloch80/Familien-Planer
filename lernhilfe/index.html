@@ -4,31 +4,29 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Lernhilfe</title>
-  <meta name="description" content="Lernhilfe Mathe, Englisch und Französisch – Vokabeln, Grammatik und Übungen mit Kontrolle.">
+  <meta name="description" content="Lernhilfe: Fotos von Schulmaterial machen – Fach und Thema werden erkannt, daraus entstehen Vokabeln, Erklärungen und Übungen.">
   <meta name="theme-color" content="#3b5bdb">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="css/style.css?v=1">
+  <link rel="stylesheet" href="css/style.css?v=2">
 </head>
 <body>
   <a class="skip" href="#app">Zum Inhalt</a>
   <header class="top">
     <a class="brand" href="#/"><img src="favicon.svg" alt="" width="28" height="28"> Lernhilfe</a>
-    <nav class="top-nav">
-      <a href="#/mathe">Mathe</a>
-      <a href="#/englisch">Englisch</a>
-      <a href="#/franz">Französisch</a>
-    </nav>
   </header>
-  <main id="app" tabindex="-1"></main>
+  <div class="layout">
+    <aside class="side" id="side" aria-label="Fächer"></aside>
+    <main id="app" tabindex="-1"></main>
+  </div>
   <footer class="foot">
     <p>Dein Lernstand wird nur auf diesem Gerät gespeichert.
       <button type="button" class="link" id="resetAll">Lernstand zurücksetzen</button></p>
   </footer>
   <noscript><p class="card">Bitte JavaScript aktivieren, damit die Lernhilfe funktioniert.</p></noscript>
-  <script src="js/data-mathe.js?v=1"></script>
-  <script src="js/data-englisch.js?v=1"></script>
-  <script src="js/data-franz.js?v=1"></script>
-  <script src="js/trainer-mathe.js?v=1"></script>
-  <script src="js/app.js?v=1"></script>
+  <script src="js/data-mathe.js?v=2"></script>
+  <script src="js/data-englisch.js?v=2"></script>
+  <script src="js/data-franz.js?v=2"></script>
+  <script src="js/trainer-mathe.js?v=2"></script>
+  <script src="js/app.js?v=2"></script>
 </body>
 </html>

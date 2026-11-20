@@ -23,3 +23,5 @@ dist-ssr
 *.sln
 *.sw?
 public/api/config.php
+lernhilfe/api/vendor/
+lernhilfe/api/config.php
