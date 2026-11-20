@@ -122,6 +122,32 @@ main { width: 100%; max-width: 920px; margin: 0 auto; padding: 20px 16px 40px; f
   .nav-list a { padding: 11px 12px; font-size: 1.08rem; }
 }
 
+/* Anmeldung */
+.user-box { margin-left: auto; }
+.user-btn { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 99px; padding: 3px 12px 3px 3px; font: inherit; font-weight: 600; font-size: .92rem; cursor: pointer; }
+.user-btn:hover { background: var(--surface-2); }
+.avatar { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; font-weight: 700; flex-shrink: 0; width: 44px; height: 44px; font-size: 1rem; }
+.avatar.sm { width: 30px; height: 30px; font-size: .78rem; }
+.avatar.xs { width: 24px; height: 24px; font-size: .65rem; }
+.avatar.lg { width: 84px; height: 84px; font-size: 1.8rem; box-shadow: 0 4px 14px rgba(0,0,0,.15); }
+.no-user .side, .no-user .menu-btn, .no-user .backdrop { display: none !important; }
+.no-user main { max-width: 640px; }
+.login { text-align: center; padding: 24px 0; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.login h1 { font-size: 2rem; margin: 0; }
+.kids { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px; margin: 8px 0; }
+.kid-wrap { position: relative; }
+.kid { display: flex; flex-direction: column; align-items: center; gap: 8px; border: 0; background: none; color: var(--text); font: inherit; font-weight: 700; font-size: 1.1rem; cursor: pointer; padding: 10px; border-radius: 16px; min-width: 110px; }
+.kid:hover:not(:disabled) { background: var(--surface); box-shadow: var(--shadow); }
+.kid:hover .avatar { transform: scale(1.05); }
+.kid .avatar { transition: transform .15s; }
+.kid:disabled { cursor: default; opacity: .7; }
+.kid-x { position: absolute; top: 2px; right: 8px; width: 30px; height: 30px; border-radius: 50%; border: 0; background: var(--bad); color: #fff; font-size: .9rem; cursor: pointer; }
+.add-kid { width: 100%; max-width: 380px; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); }
+.add-kid label { font-weight: 600; font-size: .9rem; display: block; margin-bottom: 6px; }
+.add-row { display: flex; gap: 8px; }
+.add-row input { flex: 1; min-width: 0; font-size: 1.05rem; }
+@media (max-width: 520px) { .user-name { display: none; } .user-btn { padding: 3px; } }
+
 /* Fotos */
 .small-hero { padding: 8px 0 4px; }
 .small-hero h1 { font-size: 1.9rem; }

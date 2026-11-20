@@ -5,16 +5,32 @@
   const ORDER = ['mathe', 'englisch', 'franz'];
   const app = document.getElementById('app');
 
-  // ---------- Speicher (nur auf diesem Gerät) ----------
-  const KEY = 'lernhilfe:v1';
-  let store = { vocab: {}, ex: {}, prefs: {} };
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) store = Object.assign(store, JSON.parse(raw));
-  } catch (e) { /* ohne Speicher weiter */ }
-  function save() {
-    try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) { /* egal */ }
+  // ---------- Kinder & Lernstand (nur auf diesem Gerät) ----------
+  // Jedes Kind hat seinen eigenen Lernstand. Angemeldet wird nur mit dem Namen.
+  const PKEY = 'lernhilfe:kinder';
+  const OLD_KEY = 'lernhilfe:v1';
+  const COLORS = ['#e8590c', '#1c7ed6', '#2b8a3e', '#d6336c', '#7048e8', '#0c8599', '#f08c00', '#c2255c'];
+  let profiles = { list: [], current: null };
+  try { profiles = Object.assign(profiles, JSON.parse(localStorage.getItem(PKEY) || '{}')); } catch (e) { /* egal */ }
+  const keyFor = (id) => 'lernhilfe:v1:' + id;
+  const currentKid = () => profiles.list.find((k) => k.id === profiles.current) || null;
+  function saveProfiles() {
+    try { localStorage.setItem(PKEY, JSON.stringify(profiles)); } catch (e) { /* egal */ }
   }
+  let store = { vocab: {}, ex: {}, prefs: {} };
+  function loadStore() {
+    store = { vocab: {}, ex: {}, prefs: {} };
+    if (!currentKid()) return;
+    try {
+      const raw = localStorage.getItem(keyFor(profiles.current));
+      if (raw) store = Object.assign(store, JSON.parse(raw));
+    } catch (e) { /* ohne Speicher weiter */ }
+  }
+  function save() {
+    if (!currentKid()) return;
+    try { localStorage.setItem(keyFor(profiles.current), JSON.stringify(store)); } catch (e) { /* egal */ }
+  }
+  loadStore();
 
   // ---------- Hilfsfunktionen ----------
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -323,6 +339,7 @@
   function renderSide(activeRoute) {
     const side = document.getElementById('side');
     if (!side) return;
+    if (!currentKid()) { side.innerHTML = ''; return; }
     const list = faecherList();
     if (currentFach && !list.includes(currentFach)) currentFach = '';
     const here = activeRoute || location.hash || '#/';
@@ -334,6 +351,7 @@
       </div>
       <nav class="nav-list" aria-label="Hauptmenü">
         <a href="#/" class="${here === '#/' ? 'active' : ''}"><span class="ni" aria-hidden="true">${FOTOS_AKTIV ? '📷' : '🏠'}</span>${FOTOS_AKTIV ? 'Neue Fotos' : 'Übersicht'}</a>
+        ${currentKid() ? `<a href="#/" id="switchKid"><span class="ni" aria-hidden="true">${avatar(currentKid(), 'xs')}</span>Kind wechseln</a>` : ''}
       </nav>
       <div class="nav-sep"></div>
       <div class="nav-title">Fächer</div>
@@ -349,6 +367,8 @@
           g.topics.map((x) => `<a href="${x.subj.route}" class="${isActive(x.subj.route) ? 'active' : ''}"><span class="ni" aria-hidden="true">📄</span>${esc(x.title)}${x.builtin ? '' : x.t.basis ? ' <span class="tag">Ergänzung</span>' : ''}</a>`).join('')).join('')}
       </nav>` : ''}`;
     side.querySelector('#drawerClose').addEventListener('click', closeDrawer);
+    const sw = side.querySelector('#switchKid');
+    if (sw) sw.addEventListener('click', (e) => { e.preventDefault(); closeDrawer(); logout(); });
   }
 
   // Ausklappbares Menü auf dem Handy
@@ -369,6 +389,8 @@
   function route(keepScroll) {
     const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
     if (keepScroll !== true) window.scrollTo(0, 0);
+    renderUser();
+    if (!currentKid()) return renderLogin();
     let subj = null, tabPart = null;
     if (parts[0] === 'f' && parts[1]) {
       currentFach = parts[1];
@@ -584,6 +606,97 @@
     return (L.themen || []).map((t) => Object.assign({ static: true }, t)).concat(remote);
   }
 
+  // ---------- Anmeldung ----------
+  const initials = (n) => n.trim().split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+  const avatar = (k, cls = '') => `<span class="avatar ${cls}" style="background:${k.color}" aria-hidden="true">${esc(initials(k.name))}</span>`;
+
+  function login(id) {
+    profiles.current = id;
+    saveProfiles();
+    loadStore();
+    currentFach = store.prefs.fach || '';
+    if (location.hash && location.hash !== '#/') location.hash = '#/';
+    else route();
+  }
+  function logout() {
+    profiles.current = null;
+    saveProfiles();
+    loadStore();
+    currentFach = '';
+    if (location.hash && location.hash !== '#/') location.hash = '#/';
+    else route();
+  }
+  function addKid(name) {
+    name = name.trim().replace(/\s+/g, ' ').slice(0, 30);
+    if (!name) return;
+    const existing = profiles.list.find((k) => k.name.toLowerCase() === name.toLowerCase());
+    if (existing) return login(existing.id);
+    const id = 'k' + Date.now().toString(36);
+    profiles.list.push({ id, name, color: COLORS[profiles.list.length % COLORS.length] });
+    // Lernstand aus der Zeit vor den Profilen übernimmt das erste Kind
+    if (profiles.list.length === 1) {
+      try {
+        const old = localStorage.getItem(OLD_KEY);
+        if (old) { localStorage.setItem(keyFor(id), old); localStorage.removeItem(OLD_KEY); }
+      } catch (e) { /* egal */ }
+    }
+    login(id);
+  }
+  function removeKid(id) {
+    const k = profiles.list.find((x) => x.id === id);
+    if (!k || !confirm(`${k.name} entfernen? Der Lernstand von ${k.name} auf diesem Gerät wird gelöscht.`)) return;
+    profiles.list = profiles.list.filter((x) => x.id !== id);
+    try { localStorage.removeItem(keyFor(id)); } catch (e) { /* egal */ }
+    saveProfiles();
+    renderLogin(true);
+  }
+
+  function renderUser() {
+    const el = document.getElementById('userBox');
+    const k = currentKid();
+    document.body.classList.toggle('no-user', !k);
+    if (!el) return;
+    el.innerHTML = k ? `<button type="button" class="user-btn" id="userBtn" title="Kind wechseln">${avatar(k, 'sm')}<span class="user-name">${esc(k.name)}</span></button>` : '';
+    const b = document.getElementById('userBtn');
+    if (b) b.addEventListener('click', logout);
+  }
+
+  function renderLogin(editing) {
+    document.title = 'Anmelden – Lernhilfe';
+    document.body.dataset.subject = '';
+    const side = document.getElementById('side');
+    if (side) side.innerHTML = '';
+    const list = profiles.list;
+    app.innerHTML = `
+      <section class="login">
+        <img src="favicon.svg" alt="" width="64" height="64">
+        <h1>Wer lernt heute?</h1>
+        ${list.length ? `<div class="kids">${list.map((k) => `
+          <div class="kid-wrap">
+            <button type="button" class="kid" data-id="${k.id}" ${editing ? 'disabled' : ''}>${avatar(k, 'lg')}<span>${esc(k.name)}</span></button>
+            ${editing ? `<button type="button" class="kid-x" data-rm="${k.id}" aria-label="${esc(k.name)} entfernen">✕</button>` : ''}
+          </div>`).join('')}</div>` : '<p class="muted">Gib deinen Namen ein, um zu starten.</p>'}
+        <form class="add-kid" id="addKid" autocomplete="off">
+          <label for="kidName">${list.length ? 'Neues Kind' : 'Dein Name'}</label>
+          <div class="add-row">
+            <input type="text" id="kidName" maxlength="30" placeholder="Vorname" autocapitalize="words" ${list.length ? '' : 'autofocus'}>
+            <button class="btn primary" type="submit">${list.length ? 'Hinzufügen' : 'Los geht’s'}</button>
+          </div>
+        </form>
+        ${list.length ? `<button type="button" class="link small" id="editKids">${editing ? 'Fertig' : 'Namen bearbeiten'}</button>` : ''}
+        <p class="muted small">Kein Passwort nötig. Der Lernstand jedes Kindes wird auf diesem Gerät gespeichert.</p>
+      </section>`;
+    app.querySelectorAll('.kid').forEach((b) => b.addEventListener('click', () => login(b.dataset.id)));
+    app.querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', () => removeKid(b.dataset.rm)));
+    const ed = app.querySelector('#editKids');
+    if (ed) ed.addEventListener('click', () => renderLogin(!editing));
+    app.querySelector('#addKid').addEventListener('submit', (e) => {
+      e.preventDefault();
+      addKid(app.querySelector('#kidName').value);
+    });
+    if (!list.length) app.querySelector('#kidName').focus();
+  }
+
   // ---------- Startseite: Übersicht ----------
   function renderStart() {
     document.title = 'Lernhilfe';
@@ -593,8 +706,8 @@
       .map((t) => ({ subj: topicSubj(t), title: t.titel, t }));
     app.innerHTML = `
       <section class="hero small-hero">
-        <h1>Lernhilfe</h1>
-        <p>Wähle links ein Fach. Pro Epoche kannst du ein Lernheft als PDF drucken.</p>
+        <h1>Hallo ${esc(currentKid().name)}!</h1>
+        <p>Wähle ein Fach. Pro Epoche kannst du ein Lernheft als PDF drucken.</p>
       </section>
       <div class="subjects">${faecherList().map((f) => {
         const eps = epochenOf(f);
@@ -1279,7 +1392,8 @@
 
   // ---------- Fortschritt zurücksetzen ----------
   document.getElementById('resetAll').addEventListener('click', () => {
-    if (!confirm('Den gesamten Lernstand auf diesem Gerät löschen?')) return;
+    const k = currentKid();
+    if (!k || !confirm(`Den Lernstand von ${k.name} auf diesem Gerät löschen?`)) return;
     store = { vocab: {}, ex: {}, prefs: {} };
     save();
     route();
