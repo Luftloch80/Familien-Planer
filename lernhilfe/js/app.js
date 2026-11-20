@@ -5,32 +5,194 @@
   const ORDER = ['mathe', 'englisch', 'franz'];
   const app = document.getElementById('app');
 
-  // ---------- Kinder & Lernstand (nur auf diesem Gerät) ----------
+  // ---------- Kinder & Lernstand ----------
   // Jedes Kind hat seinen eigenen Lernstand. Angemeldet wird nur mit dem Namen.
+  // Gespeichert wird sofort auf dem Gerät und im Hintergrund in der Datenbank
+  // (api/lernstand.php), damit der Stand auf allen Geräten gleich ist.
   const PKEY = 'lernhilfe:kinder';
   const OLD_KEY = 'lernhilfe:v1';
+  const SYNC_API = 'api/lernstand.php';
   const COLORS = ['#e8590c', '#1c7ed6', '#2b8a3e', '#d6336c', '#7048e8', '#0c8599', '#f08c00', '#c2255c'];
-  let profiles = { list: [], current: null };
+  let profiles = { list: [], current: null, rev: {} };
   try { profiles = Object.assign(profiles, JSON.parse(localStorage.getItem(PKEY) || '{}')); } catch (e) { /* egal */ }
+  if (!profiles.rev) profiles.rev = {};
   const keyFor = (id) => 'lernhilfe:v1:' + id;
   const currentKid = () => profiles.list.find((k) => k.id === profiles.current) || null;
   function saveProfiles() {
     try { localStorage.setItem(PKEY, JSON.stringify(profiles)); } catch (e) { /* egal */ }
   }
-  let store = { vocab: {}, ex: {}, prefs: {} };
-  function loadStore() {
-    store = { vocab: {}, ex: {}, prefs: {} };
-    if (!currentKid()) return;
+  const emptyStore = () => ({ vocab: {}, vt: {}, ex: {}, prefs: {}, _reset: 0 });
+  let store = emptyStore();
+  function readLocal(id) {
     try {
-      const raw = localStorage.getItem(keyFor(profiles.current));
-      if (raw) store = Object.assign(store, JSON.parse(raw));
-    } catch (e) { /* ohne Speicher weiter */ }
+      const raw = localStorage.getItem(keyFor(id));
+      return Object.assign(emptyStore(), raw ? JSON.parse(raw) : {});
+    } catch (e) { return emptyStore(); }
   }
+  function writeLocal(id, data) {
+    try { localStorage.setItem(keyFor(id), JSON.stringify(data)); } catch (e) { /* egal */ }
+  }
+  function loadStore() {
+    store = currentKid() ? readLocal(profiles.current) : emptyStore();
+  }
+  // Fingerabdruck nur des Lernfortschritts (nicht der Anzeige-Einstellungen)
+  const progressFp = (d) => JSON.stringify([d._reset || 0, Object.entries(d.vocab || {}).sort(), Object.entries(d.ex || {}).sort()]);
+  let lastFp = '';
   function save() {
     if (!currentKid()) return;
-    try { localStorage.setItem(keyFor(profiles.current), JSON.stringify(store)); } catch (e) { /* egal */ }
+    writeLocal(profiles.current, store);
+    const fp = progressFp(store);
+    if (fp !== lastFp) { lastFp = fp; scheduleSync(); }
   }
   loadStore();
+  lastFp = progressFp(store);
+
+  // Zwei Stände zusammenführen: pro Vokabel gewinnt die neuere Antwort,
+  // bei Übungen das beste Ergebnis. Nach "Lernstand zurücksetzen" gewinnt der neuere Neustart.
+  function mergeStores(a, b) {
+    a = Object.assign(emptyStore(), a || {});
+    b = Object.assign(emptyStore(), b || {});
+    if ((a._reset || 0) !== (b._reset || 0)) return JSON.parse(JSON.stringify((a._reset || 0) > (b._reset || 0) ? a : b));
+    const out = emptyStore();
+    out._reset = a._reset || 0;
+    out.prefs = Object.assign({}, b.prefs, a.prefs);
+    new Set([...Object.keys(a.vocab), ...Object.keys(b.vocab)]).forEach((k) => {
+      const ta = a.vt[k] || 0, tb = b.vt[k] || 0;
+      const fromA = ta !== tb ? ta > tb : (a.vocab[k] || 0) >= (b.vocab[k] || 0);
+      const src = fromA ? a : b;
+      if (src.vocab[k] != null) out.vocab[k] = src.vocab[k];
+      if (src.vt[k]) out.vt[k] = src.vt[k];
+    });
+    new Set([...Object.keys(a.ex), ...Object.keys(b.ex)]).forEach((k) => {
+      const x = a.ex[k], y = b.ex[k];
+      out.ex[k] = !x ? y : !y ? x : (x.best / x.total >= y.best / y.total ? x : y);
+    });
+    return out;
+  }
+
+  async function syncCall(method, action, body, query) {
+    const r = await fetch(`${SYNC_API}?action=${action}${query || ''}`, {
+      method,
+      cache: 'no-store',
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 409) return { conflict: true, kind: d.kind };
+    if (!r.ok) throw new Error(d.error || 'Fehler ' + r.status);
+    return d;
+  }
+
+  let syncTimer = null;
+  let syncing = null;
+  let syncAgain = false;
+  function scheduleSync() {
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => syncKid(), 1200);
+  }
+  // Lernstand des angemeldeten Kindes mit der Datenbank abgleichen
+  async function syncKid() {
+    if (syncing) { syncAgain = true; return syncing; }
+    const id = profiles.current;
+    if (!id) return;
+    syncing = (async () => {
+      try {
+        let server = (await syncCall('GET', 'get', null, '&id=' + encodeURIComponent(id))).kind;
+        for (let i = 0; i < 4; i++) {
+          if (profiles.current !== id) return;
+          const before = progressFp(store);
+          const merged = mergeStores(store, server.data);
+          const changedHere = progressFp(merged) !== before;
+          store = merged;
+          writeLocal(id, store);
+          lastFp = progressFp(store);
+          profiles.rev[id] = server.ts;
+          saveProfiles();
+          if (changedHere) refreshView();
+          if (progressFp(merged) === progressFp(Object.assign(emptyStore(), server.data))) break;
+          const res = await syncCall('POST', 'save', { id, base: server.ts, data: merged });
+          if (!res.conflict) { profiles.rev[id] = res.ts; saveProfiles(); break; }
+          server = res.kind;
+        }
+        setSyncState('ok');
+      } catch (e) {
+        if (/nicht gefunden/.test(e.message)) {
+          // Kind gibt es auf dem Server nicht (mehr): neu anlegen und erneut versuchen
+          const k = currentKid();
+          if (k) { try { await syncCall('POST', 'add', { id: k.id, name: k.name, color: k.color }); syncAgain = true; } catch (e2) { /* offline */ } }
+        } else setSyncState('offline');
+      } finally {
+        syncing = null;
+        if (syncAgain) { syncAgain = false; scheduleSync(); }
+      }
+    })();
+    return syncing;
+  }
+  function refreshView() {
+    const a = document.activeElement;
+    if (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return; // nicht beim Tippen neu zeichnen
+    if (typeof route === 'function') route(true);
+  }
+  let syncState = '';
+  function setSyncState(st) {
+    syncState = st;
+    const el = document.getElementById('userBtn');
+    if (el) el.classList.toggle('offline', st === 'offline');
+  }
+
+  // Kinderliste mit der Datenbank abgleichen
+  async function syncKids() {
+    let server;
+    try { server = (await syncCall('GET', 'kinder')).kinder || []; } catch (e) { setSyncState('offline'); return; }
+    let changed = false;
+    // lokale Kinder ohne Server-Eintrag hochladen (bzw. per Name zuordnen)
+    for (const k of profiles.list.slice()) {
+      if (server.some((x) => x.id === k.id)) continue;
+      const same = server.find((x) => x.name.toLowerCase() === k.name.toLowerCase());
+      if (same) {
+        renameKid(k.id, same.id);
+        changed = true;
+        continue;
+      }
+      if (k.synced) {
+        // wurde auf einem anderen Gerät entfernt
+        profiles.list = profiles.list.filter((x) => x.id !== k.id);
+        if (profiles.current === k.id) { profiles.current = null; loadStore(); }
+        changed = true;
+        continue;
+      }
+      try {
+        const res = await syncCall('POST', 'add', { id: k.id, name: k.name, color: k.color });
+        if (res.kind.id !== k.id) renameKid(k.id, res.kind.id);
+        server.push(res.kind);
+      } catch (e) { /* später nochmal */ }
+    }
+    // Kinder vom Server übernehmen
+    server.forEach((x) => {
+      const k = profiles.list.find((y) => y.id === x.id);
+      if (!k) { profiles.list.push({ id: x.id, name: x.name, color: x.color, synced: true }); changed = true; }
+      else if (!k.synced || k.name !== x.name || k.color !== x.color) { Object.assign(k, { name: x.name, color: x.color, synced: true }); changed = true; }
+    });
+    saveProfiles();
+    setSyncState('ok');
+    if (changed && !currentKid() && typeof route === 'function') route(true);
+  }
+  function renameKid(oldId, newId) {
+    const k = profiles.list.find((x) => x.id === oldId);
+    if (!k) return;
+    if (profiles.list.some((x) => x.id === newId)) {
+      // beide Einträge zusammenführen
+      writeLocal(newId, mergeStores(readLocal(newId), readLocal(oldId)));
+      profiles.list = profiles.list.filter((x) => x.id !== oldId);
+    } else {
+      writeLocal(newId, readLocal(oldId));
+      k.id = newId;
+      k.synced = true;
+    }
+    try { localStorage.removeItem(keyFor(oldId)); } catch (e) { /* egal */ }
+    if (profiles.current === oldId) { profiles.current = newId; loadStore(); }
+    saveProfiles();
+  }
 
   // ---------- Hilfsfunktionen ----------
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -150,6 +312,7 @@
   function setBox(w, ok) {
     const b = boxOf(w);
     store.vocab[w.key] = ok ? Math.min(4, b + 1) : 0;
+    store.vt[w.key] = Date.now();
     save();
   }
   function vocabStats(subj) {
@@ -605,37 +768,53 @@
     profiles.current = id;
     saveProfiles();
     loadStore();
+    lastFp = progressFp(store);
     currentFach = store.prefs.fach || '';
     if (location.hash && location.hash !== '#/') location.hash = '#/';
     else route();
+    syncKid();
   }
   function logout() {
+    clearTimeout(syncTimer);
+    if (currentKid()) syncKid();
     profiles.current = null;
     saveProfiles();
     loadStore();
     currentFach = '';
     if (location.hash && location.hash !== '#/') location.hash = '#/';
     else route();
+    syncKids();
   }
-  function addKid(name) {
+  async function addKid(name) {
     name = name.trim().replace(/\s+/g, ' ').slice(0, 30);
     if (!name) return;
     const existing = profiles.list.find((k) => k.name.toLowerCase() === name.toLowerCase());
     if (existing) return login(existing.id);
-    const id = 'k' + Date.now().toString(36);
-    profiles.list.push({ id, name, color: COLORS[profiles.list.length % COLORS.length] });
+    let id = 'k' + Date.now().toString(36);
+    let color = COLORS[profiles.list.length % COLORS.length];
+    let synced = false;
+    try {
+      const res = await syncCall('POST', 'add', { id, name, color });
+      id = res.kind.id; name = res.kind.name; color = res.kind.color; synced = true;
+    } catch (e) { /* offline: später hochladen */ }
+    if (profiles.list.some((k) => k.id === id)) return login(id);
+    profiles.list.push({ id, name, color, synced });
     // Lernstand aus der Zeit vor den Profilen übernimmt das erste Kind
     if (profiles.list.length === 1) {
       try {
         const old = localStorage.getItem(OLD_KEY);
-        if (old) { localStorage.setItem(keyFor(id), old); localStorage.removeItem(OLD_KEY); }
+        if (old) { writeLocal(id, Object.assign(emptyStore(), JSON.parse(old))); localStorage.removeItem(OLD_KEY); }
       } catch (e) { /* egal */ }
     }
     login(id);
   }
-  function removeKid(id) {
+  async function removeKid(id) {
     const k = profiles.list.find((x) => x.id === id);
-    if (!k || !confirm(`${k.name} entfernen? Der Lernstand von ${k.name} auf diesem Gerät wird gelöscht.`)) return;
+    if (!k || !confirm(`${k.name} entfernen? Der Lernstand von ${k.name} wird auf allen Geräten gelöscht.`)) return;
+    try { await syncCall('POST', 'delete', { id }); } catch (e) {
+      alert('Gerade keine Verbindung zum Server. Bitte später nochmal versuchen.');
+      return;
+    }
     profiles.list = profiles.list.filter((x) => x.id !== id);
     try { localStorage.removeItem(keyFor(id)); } catch (e) { /* egal */ }
     saveProfiles();
@@ -647,7 +826,7 @@
     const k = currentKid();
     document.body.classList.toggle('no-user', !k);
     if (!el) return;
-    el.innerHTML = k ? `<button type="button" class="user-btn" id="userBtn" title="Kind wechseln">${avatar(k, 'sm')}<span class="user-name">${esc(k.name)}</span></button>` : '';
+    el.innerHTML = k ? `<button type="button" class="user-btn ${syncState === 'offline' ? 'offline' : ''}" id="userBtn" title="Kind wechseln">${avatar(k, 'sm')}<span class="user-name">${esc(k.name)}</span></button>` : '';
     const b = document.getElementById('userBtn');
     if (b) b.addEventListener('click', logout);
   }
@@ -675,7 +854,7 @@
           </div>
         </form>
         ${list.length ? `<button type="button" class="link small" id="editKids">${editing ? 'Fertig' : 'Namen bearbeiten'}</button>` : ''}
-        <p class="muted small">Kein Passwort nötig. Der Lernstand jedes Kindes wird auf diesem Gerät gespeichert.</p>
+        <p class="muted small">Kein Passwort nötig. Der Lernstand wird gespeichert und ist auf allen Geräten gleich.</p>
       </section>`;
     app.querySelectorAll('.kid').forEach((b) => b.addEventListener('click', () => login(b.dataset.id)));
     app.querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', () => removeKid(b.dataset.rm)));
@@ -1396,8 +1575,8 @@
   // ---------- Fortschritt zurücksetzen ----------
   document.getElementById('resetAll').addEventListener('click', () => {
     const k = currentKid();
-    if (!k || !confirm(`Den Lernstand von ${k.name} auf diesem Gerät löschen?`)) return;
-    store = { vocab: {}, ex: {}, prefs: {} };
+    if (!k || !confirm(`Den Lernstand von ${k.name} löschen (auf allen Geräten)?`)) return;
+    store = Object.assign(emptyStore(), { prefs: store.prefs, _reset: Date.now() });
     save();
     route();
   });
@@ -1405,4 +1584,7 @@
   ORDER.forEach((id) => { L[id].route = '#/' + id; L[id].fach = id; });
   loadRemote();
   route();
+  syncKids().then(() => { if (currentKid()) syncKid(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && currentKid()) syncKid(); });
+  window.addEventListener('online', () => { syncKids(); if (currentKid()) syncKid(); });
 })();

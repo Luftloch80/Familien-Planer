@@ -14,6 +14,12 @@
 
 declare(strict_types=1);
 
+if (!is_file(__DIR__ . '/vendor/autoload.php')) {
+    http_response_code(503);
+    header('Content-Type: application/json; charset=utf-8');
+    echo '{"error":"Fotoerkennung ist nicht eingerichtet"}';
+    exit;
+}
 require __DIR__ . '/vendor/autoload.php';
 
 use Anthropic\Client;

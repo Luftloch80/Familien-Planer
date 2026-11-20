@@ -126,6 +126,8 @@ main { width: 100%; max-width: 920px; margin: 0 auto; padding: 20px 16px 40px; f
 .user-box { margin-left: auto; }
 .user-btn { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 99px; padding: 3px 12px 3px 3px; font: inherit; font-weight: 600; font-size: .92rem; cursor: pointer; }
 .user-btn:hover { background: var(--surface-2); }
+.user-btn { position: relative; }
+.user-btn.offline::after { content: ""; position: absolute; top: 1px; right: 1px; width: 10px; height: 10px; border-radius: 50%; background: var(--almost); border: 2px solid var(--surface); }
 .avatar { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; font-weight: 700; flex-shrink: 0; width: 44px; height: 44px; font-size: 1rem; }
 .avatar.sm { width: 30px; height: 30px; font-size: .78rem; }
 .avatar.xs { width: 24px; height: 24px; font-size: .65rem; }
