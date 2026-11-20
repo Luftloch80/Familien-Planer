@@ -65,3 +65,14 @@ Von Hand: `FIREBASE_PROJECT_ID=… FIREBASE_API_KEY=… SITE_URL=https://… nod
   (Updates kommen sofort an) und leitet auf HTTPS um.
 - Alte Dateien im Zielverzeichnis werden nicht gelöscht. Die Build-Dateien haben
   eindeutige Namen, es sammeln sich also nur ein paar alte Dateien an.
+
+## Lernhilfe (`lernhilfe/`)
+
+Statische Seite ohne Build (HTML/CSS/JS, keine Datenbank). Bei jedem Push auf
+`main`, der etwas in `lernhilfe/` ändert, lädt `.github/workflows/deploy-lernhilfe.yml`
+den Ordner per SFTP nach `/lernhilfe` im Strato-Webspace (gleiche SFTP-Secrets
+wie oben). Anderes Zielverzeichnis: Secret `STRATO_LERNHILFE_DIR` setzen.
+Erreichbar ist die Seite über eine Domain/Subdomain, die bei Strato auf das
+Verzeichnis `/lernhilfe` zeigt (z. B. `lernhilfe.deine-domain.de`), oder als
+Unterordner einer Domain, die auf das Webspace-Hauptverzeichnis zeigt.
+Lokal ansehen: `lernhilfe/index.html` im Browser öffnen.

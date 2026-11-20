@@ -1,0 +1,38 @@
+name: Lernhilfe auf Strato
+
+# Lädt den Ordner lernhilfe/ (statische Seite, kein Build nötig) per SFTP
+# in den Ordner /lernhilfe im Strato-Webspace. Anderes Ziel: Secret
+# STRATO_LERNHILFE_DIR setzen.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'lernhilfe/**'
+      - '.github/workflows/deploy-lernhilfe.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-lernhilfe
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Per SFTP hochladen
+        env:
+          SFTP_HOST: ${{ secrets.STRATO_SFTP_HOST }}
+          SFTP_USER: ${{ secrets.STRATO_SFTP_USER }}
+          SFTP_PASSWORD: ${{ secrets.STRATO_SFTP_PASSWORD }}
+          REMOTE_DIR: ${{ secrets.STRATO_LERNHILFE_DIR || '/lernhilfe' }}
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+          lftp -c "
+            set sftp:auto-confirm yes;
+            set net:max-retries 3;
+            open -u \"$SFTP_USER\",\"$SFTP_PASSWORD\" sftp://$SFTP_HOST;
+            mkdir -p -f \"$REMOTE_DIR\";
+            mirror -R --verbose --parallel=4 lernhilfe/ \"$REMOTE_DIR\"
+          "

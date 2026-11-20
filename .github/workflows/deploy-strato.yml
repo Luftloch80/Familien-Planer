@@ -3,6 +3,9 @@ name: Deploy auf Strato
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'lernhilfe/**'
+      - '.github/workflows/deploy-lernhilfe.yml'
   workflow_dispatch:
 
 concurrency:
