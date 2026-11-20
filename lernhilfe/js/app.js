@@ -350,7 +350,6 @@
       </div>
       <nav class="nav-list" aria-label="Hauptmenü">
         <a href="#/" class="${here === '#/' ? 'active' : ''}"><span class="ni" aria-hidden="true">${FOTOS_AKTIV ? '📷' : '🏠'}</span>${FOTOS_AKTIV ? 'Neue Fotos' : 'Übersicht'}</a>
-        ${currentKid() ? `<a href="#/" id="switchKid"><span class="ni" aria-hidden="true">${avatar(currentKid(), 'xs')}</span>Kind wechseln</a>` : ''}
       </nav>
       <div class="nav-sep"></div>
       <div class="nav-title">Fächer</div>
@@ -360,8 +359,6 @@
       </nav>
       `;
     side.querySelector('#drawerClose').addEventListener('click', closeDrawer);
-    const sw = side.querySelector('#switchKid');
-    if (sw) sw.addEventListener('click', (e) => { e.preventDefault(); closeDrawer(); logout(); });
   }
 
   // Ausklappbares Menü auf dem Handy
