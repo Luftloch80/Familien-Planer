@@ -61,6 +61,36 @@ const BASIS_THEMEN = [
         'zusammenfassung' => 'Vokabeln Chapitre 1 (Ende), Chapitre 2 „Voisins et amis“, Chapitre 3 „Les étrangers“; Grammatik passé récent (venir de + Infinitiv) und Abgrenzung zum futur proche.'],
 ];
 
+// Eingebaute Themen plus die Themen aus js/data-themen.js (im Repo gepflegt)
+function basisThemen(): array
+{
+    static $list = null;
+    if ($list !== null) return $list;
+    $list = BASIS_THEMEN;
+    $file = __DIR__ . '/../js/data-themen.js';
+    if (is_file($file)) {
+        $js = (string)file_get_contents($file);
+        $start = strpos($js, 'window.LERN.themen =');
+        if ($start !== false) {
+            $json = trim(substr($js, $start + strlen('window.LERN.themen =')));
+            $json = rtrim($json, "; \n\r\t");
+            $themen = json_decode($json, true);
+            foreach (is_array($themen) ? $themen : [] as $t) {
+                $d = $t['data'] ?? [];
+                $list[] = [
+                    'id' => 'repo-' . ($t['id'] ?? ''),
+                    'fach' => $t['fach'] ?? 'sonstiges',
+                    'epoche' => $d['epoche'] ?? '',
+                    'titel' => $t['titel'] ?? '',
+                    'zusammenfassung' => $d['zusammenfassung'] ?? '',
+                    'vokabeln' => array_slice(array_map(fn ($v) => $v['begriff'] ?? '', $d['vokabeln'] ?? []), 0, 150),
+                ];
+            }
+        }
+    }
+    return $list;
+}
+
 function fail(int $status, string $message): never
 {
     http_response_code($status);
@@ -219,7 +249,7 @@ function analyze(): void
     // Bekannte Themen als Kandidaten für die Zuordnung
     $themen = loadThemen();
     $known = [];
-    foreach (BASIS_THEMEN as $b) $known[] = $b;
+    foreach (basisThemen() as $b) $known[] = $b;
     foreach ($themen as $t) {
         $d = $t['data'];
         $known[] = [
@@ -324,7 +354,7 @@ function saveResult(array $r, array $themen, int $fotos): array
 {
     $fach = array_key_exists($r['fach'], FAECHER) ? $r['fach'] : 'sonstiges';
     $id = trim((string)$r['thema_id']);
-    $basisIds = array_column(BASIS_THEMEN, 'id');
+    $basisIds = array_column(basisThemen(), 'id');
     $now = date('c');
 
     $target = null;
@@ -364,12 +394,13 @@ function saveResult(array $r, array $themen, int $fotos): array
         $titel = $target['titel'];
     } else {
         $basisTitel = '';
-        foreach (BASIS_THEMEN as $b) if ($b['id'] === $basis) $basisTitel = $b['titel'];
+        $basisFach = $fach;
+        foreach (basisThemen() as $b) if ($b['id'] === $basis) { $basisTitel = $b['titel']; $basisFach = $b['fach']; }
         $titel = $basis ? 'Ergänzung: ' . $basisTitel : ($r['titel'] ?: 'Neues Thema');
-        if ($basis) $fach = explode('-', $basis)[0];
+        if ($basis) $fach = $basisFach;
         $d = $neuerTeil + [
             'zusammenfassung' => $r['zusammenfassung'],
-            'epoche' => trim((string)($r['epoche'] ?? '')),
+            'epoche' => $basis ? (string)(array_column(basisThemen(), 'epoche', 'id')[$basis] ?? '') : trim((string)($r['epoche'] ?? '')),
             'sprache' => $r['sprache'] ?? '',
             'verlauf' => [['datum' => $now, 'fotos' => $fotos, 'titel' => $r['titel']]],
         ];

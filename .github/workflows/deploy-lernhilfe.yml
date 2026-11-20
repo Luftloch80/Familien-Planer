@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # Fotoerkennung (PHP-Schnittstelle in lernhilfe/api) mit hochladen? Braucht ANTHROPIC_API_KEY.
-      FOTOERKENNUNG: 'false'
+      FOTOERKENNUNG: 'true'
     steps:
       - uses: actions/checkout@v4
 

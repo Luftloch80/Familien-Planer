@@ -350,7 +350,7 @@
   };
   const API = 'api/api.php';
   // Fotoerkennung (braucht API-Schlüssel auf dem Server) – vorerst aus
-  const FOTOS_AKTIV = false;
+  const FOTOS_AKTIV = true;
   let remote = [];
   let apiOk = null;
   let busy = false;
@@ -375,7 +375,7 @@
       apiOk = false;
     }
     const h = location.hash;
-    if (!busy && (!h || h === '#/' || h.startsWith('#/t/') || h.startsWith('#/f/'))) route(true);
+    if (!busy && (!h || h === '#/' || h === '#/fotos' || h.startsWith('#/t/') || h.startsWith('#/f/'))) route(true);
     else renderSide();
   }
 
@@ -512,7 +512,8 @@
         <button type="button" class="drawer-close" id="drawerClose" aria-label="Menü schließen">✕</button>
       </div>
       <nav class="nav-list" aria-label="Hauptmenü">
-        <a href="#/" class="${here === '#/' ? 'active' : ''}"><span class="ni" aria-hidden="true">${FOTOS_AKTIV ? '📷' : '🏠'}</span>${FOTOS_AKTIV ? 'Neue Fotos' : 'Übersicht'}</a>
+        <a href="#/" class="${here === '#/' ? 'active' : ''}"><span class="ni" aria-hidden="true">🏠</span>Übersicht</a>
+        ${FOTOS_AKTIV ? `<a href="#/fotos" class="${here === '#/fotos' ? 'active' : ''}"><span class="ni" aria-hidden="true">📷</span>Neue Fotos</a>` : ''}
       </nav>
       <div class="nav-sep"></div>
       <div class="nav-title">Fächer</div>
@@ -569,7 +570,8 @@
       subj = L[parts[0]];
       tabPart = parts[1];
     }
-    if (!subj) { renderSide('#/'); return FOTOS_AKTIV ? renderFotos() : renderStart(); }
+    if (parts[0] === 'fotos' && FOTOS_AKTIV) { renderSide('#/fotos'); return renderFotos(); }
+    if (!subj) { renderSide('#/'); return renderStart(); }
     currentFach = subj.fach;
     store.prefs.fach = currentFach; save();
     renderSide();
@@ -741,7 +743,7 @@
         </div>
         <div class="topic-list">${g.topics.map((x) => topicCard(x)).join('')}</div>
       </section>`).join('') || '<p class="muted">Noch keine Themen.</p>'}
-      ${FOTOS_AKTIV ? `<a class="btn" href="#/">📷 Neue Fotos zu ${esc(fachName(fach))} hinzufügen</a>` : ''}`;
+      ${FOTOS_AKTIV ? `<a class="btn" href="#/fotos">📷 Neue Fotos zu ${esc(fachName(fach))} hinzufügen</a>` : ''}`;
   }
   function topicCard(x) {
     const p = progressOf(x.subj);
@@ -878,6 +880,7 @@
       <section class="hero small-hero">
         <h1>Hallo ${esc(currentKid().name)}!</h1>
         <p>Wähle ein Fach. Pro Epoche kannst du ein Lernheft als PDF drucken.</p>
+        ${FOTOS_AKTIV ? '<p><a class="btn primary big-btn" href="#/fotos">📷 Neue Fotos auswerten</a></p>' : ''}
       </section>
       <div class="subjects">${faecherList().map((f) => {
         const eps = epochenOf(f);
@@ -921,7 +924,7 @@
         <p>${esc(r.begruendung)}</p>
         ${parts.length ? `<p class="muted small">Erstellt: ${parts.join(' · ')}</p>` : ''}
         <a class="btn primary" href="#/t/${r.thema_id}">Jetzt lernen →</a>
-        ${r.basis ? ` <a class="btn" href="#/${esc(r.fach)}">Zum Lernheft</a>` : ''}
+        ${r.basis ? ` <a class="btn" href="${String(r.basis).startsWith('repo-') ? '#/t/' + esc(String(r.basis).slice(5)) : '#/' + esc(r.fach)}">Zum Hauptthema</a>` : ''}
       </div>`;
     }
     app.innerHTML = `
@@ -1006,7 +1009,7 @@
     busy = true;
     busyStart = Date.now();
     lastResult = null;
-    if (location.hash && location.hash !== '#/') location.hash = '#/';
+    if (location.hash !== '#/fotos') location.hash = '#/fotos';
     renderFotos();
     try {
       const images = [];
@@ -1033,7 +1036,7 @@
       lastResult = { error: (e && e.message && !/fetch/i.test(e.message)) ? e.message : 'Keine Verbindung zum Server. Bitte nochmal versuchen.' };
     }
     busy = false;
-    if (!location.hash || location.hash === '#/') { renderSide('#/'); renderFotos(); } else renderSide();
+    if (location.hash === '#/fotos') { renderSide('#/fotos'); renderFotos(); } else renderSide();
   }
 
   async function deleteTopic(subj) {
