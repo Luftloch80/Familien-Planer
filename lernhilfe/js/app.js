@@ -325,25 +325,45 @@
     if (!side) return;
     const list = faecherList();
     if (currentFach && !list.includes(currentFach)) currentFach = '';
-    const here = activeRoute || location.hash;
+    const here = activeRoute || location.hash || '#/';
+    const isActive = (r) => here === r || here.startsWith(r + '/');
     side.innerHTML = `
-      <a class="side-photo ${!here || here === '#/' ? 'active' : ''}" href="#/">${FOTOS_AKTIV ? '📷 Neue Fotos' : '🏠 Übersicht'}</a>
-      <label class="side-label" for="fachSel">Fach</label>
-      <select id="fachSel">
-        <option value="">– Fach wählen –</option>
-        ${list.map((f) => `<option value="${f}" ${f === currentFach ? 'selected' : ''}>${fachIcon(f)} ${fachName(f)}</option>`).join('')}
-      </select>
-      ${currentFach ? `<nav class="side-topics" aria-label="Themen">
-        <a href="#/f/${currentFach}" class="${here === '#/f/' + currentFach ? 'active' : ''}">Alle Themen in ${esc(fachName(currentFach))}</a>
-        ${epochenOf(currentFach).map((g) => `<div class="side-epoche">${g.name ? esc(g.name) : 'Ohne Epoche'}</div>` +
-          g.topics.map((x) => `<a href="${x.subj.route}" class="${here.startsWith(x.subj.route + '/') || here === x.subj.route ? 'active' : ''}">${esc(x.title)}${x.builtin ? '' : x.t.basis ? ' <span class="tag">Ergänzung</span>' : ''}</a>`).join('')).join('')}
+      <div class="drawer-head">
+        <a class="drawer-brand" href="#/"><img src="favicon.svg" alt="" width="34" height="34"> Lernhilfe</a>
+        <button type="button" class="drawer-close" id="drawerClose" aria-label="Menü schließen">✕</button>
+      </div>
+      <nav class="nav-list" aria-label="Hauptmenü">
+        <a href="#/" class="${here === '#/' ? 'active' : ''}"><span class="ni" aria-hidden="true">${FOTOS_AKTIV ? '📷' : '🏠'}</span>${FOTOS_AKTIV ? 'Neue Fotos' : 'Übersicht'}</a>
+      </nav>
+      <div class="nav-sep"></div>
+      <div class="nav-title">Fächer</div>
+      <nav class="nav-list" aria-label="Fächer">
+        ${list.map((f) => `<a href="#/f/${f}" class="${f === currentFach ? 'active' : ''}">
+          <span class="ni" aria-hidden="true">${fachIcon(f)}</span>${esc(fachName(f))}<span class="nc">${topicsOf(f).length}</span></a>`).join('')}
+      </nav>
+      ${currentFach ? `<div class="nav-sep"></div>
+      <div class="nav-title">${esc(fachName(currentFach))}</div>
+      <nav class="nav-list small-list" aria-label="Themen">
+        ${epochenOf(currentFach).map((g) => `<div class="nav-epoche">${g.name ? 'Epoche: ' + esc(g.name) : 'Ohne Epoche'}
+            <a class="nav-print" href="${printLink(currentFach, g.name)}" title="Lern-PDF dieser Epoche drucken" aria-label="Lern-PDF drucken">🖨️</a></div>` +
+          g.topics.map((x) => `<a href="${x.subj.route}" class="${isActive(x.subj.route) ? 'active' : ''}"><span class="ni" aria-hidden="true">📄</span>${esc(x.title)}${x.builtin ? '' : x.t.basis ? ' <span class="tag">Ergänzung</span>' : ''}</a>`).join('')).join('')}
       </nav>` : ''}`;
-    side.querySelector('#fachSel').addEventListener('change', (e) => {
-      currentFach = e.target.value;
-      store.prefs.fach = currentFach; save();
-      location.hash = currentFach ? '#/f/' + currentFach : '#/';
-    });
+    side.querySelector('#drawerClose').addEventListener('click', closeDrawer);
   }
+
+  // Ausklappbares Menü auf dem Handy
+  function openDrawer() {
+    document.body.classList.add('drawer-open');
+    const c = document.getElementById('drawerClose');
+    if (c) c.focus();
+  }
+  function closeDrawer() {
+    document.body.classList.remove('drawer-open');
+  }
+  document.getElementById('menuBtn').addEventListener('click', openDrawer);
+  document.getElementById('backdrop').addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
+  document.getElementById('side').addEventListener('click', (e) => { if (e.target.closest('a')) closeDrawer(); });
 
   // ---------- Routing ----------
   function route(keepScroll) {
