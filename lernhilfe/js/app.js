@@ -285,7 +285,7 @@
       tips: lang
         ? ['Vokabeln laut lesen und lernen.', 'Mit Karteikarten und Vokabeltest üben.', 'Grammatik lesen, dann die Übungen machen.']
         : ['Erklärungen lesen.', 'Übungen machen und prüfen.', 'Fehler verbessern und nochmal prüfen.'],
-      grammarLabel: lang ? 'Grammatik' : 'Wissen',
+      grammarLabel: d.wissen_titel || (lang ? 'Grammatik' : 'Wissen'),
       vocabGroups: voc.length ? [{ title: 'Vokabeln', words: voc.map((v) => [v.begriff, v.bedeutung, v.erklaerung || '']) }] : [],
       pitfalls: d.stolperfallen || [],
       grammar: (d.grammatik || []).map((g) => ({ title: g.titel, html: md(g.inhalt) })),
@@ -293,7 +293,7 @@
         id: 'u' + i,
         title: u.titel,
         intro: u.anleitung,
-        items: (u.aufgaben || []).map((a) => ({
+        items: (u.aufgaben || []).map((a) => (a.antwort && !(a.luecken || []).length ? { q: String(a.frage || ''), open: true, answer: String(a.antwort) } : {
           q: String(a.frage || ''),
           hint: a.hinweis,
           sol: a.erklaerung,
@@ -529,6 +529,7 @@
             ${ex.wordbox ? `<p class="p-wordbox">${ex.wordbox.map(esc).join(' · ')}</p>` : ''}
             <ol>${ex.items.map((it) => {
               let bi = 0;
+              if (it.open) return `<li>${esc(it.q)}<span class="pblank wide"></span><span class="pblank wide"></span></li>`;
               const q = it.choice
                 ? esc(it.q).replace('___', `( ${it.choice.map(esc).join(' / ')} )`)
                 : esc(it.q).replace(/___/g, () => printBlank(it.a[bi++]));
@@ -1223,6 +1224,7 @@
   }
   function solutionText(item) {
     if (item.choice) return item.a;
+    if (item.open) return esc(item.answer);
     const parts = item.a.map((s) => (Array.isArray(s) ? s[0] : `${fmtNum(s.n)}${s.u ? ' ' + s.u : ''}`));
     let t = parts.join(' · ');
     if (item.sol) t += ` <span class="muted">(${esc(item.sol)})</span>`;
@@ -1241,7 +1243,9 @@
           <ol class="items">${ex.items.map((it, ii) => {
             let bi = 0;
             let q;
-            if (it.choice) {
+            if (it.open) {
+              q = `${esc(it.q)}<textarea class="open-answer" rows="2" aria-label="Deine Antwort" placeholder="Deine Antwort (oder im Kopf beantworten)"></textarea>`;
+            } else if (it.choice) {
               q = esc(it.q).replace('___', `<span class="choice" role="radiogroup">${it.choice.map((c) => `<button type="button" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</span>`);
             } else {
               q = esc(it.q).replace(/___/g, () => blankHtml(it.a[bi], bi++));
@@ -1285,6 +1289,7 @@
         if (a.dataset.act === 'solve') sec.querySelectorAll('.sol').forEach((s) => (s.hidden = false));
         if (a.dataset.act === 'reset') {
           inputs.forEach((i) => { i.value = ''; i.classList.remove('ok', 'almost', 'wrong'); });
+          sec.querySelectorAll('textarea').forEach((t) => { t.value = ''; });
           sec.querySelectorAll('.choice button').forEach((b) => b.classList.remove('sel', 'ok', 'wrong'));
           sec.querySelectorAll('.sol').forEach((s) => (s.hidden = true));
           sec.querySelector('.result').innerHTML = '';
@@ -1295,6 +1300,7 @@
         let right = 0, total = 0, almost = 0;
         ex.items.forEach((it, ii) => {
           const li = sec.querySelector(`li[data-ii="${ii}"]`);
+          if (it.open) { li.querySelector('.sol').hidden = false; return; }
           if (it.choice) {
             total++;
             const sel = li.querySelector('.choice .sel');
@@ -1319,6 +1325,13 @@
           });
         });
         const key = subj.id + '|' + ex.id;
+        if (!total) {
+          // nur offene Fragen: Musterlösungen zeigen, selbst vergleichen
+          store.ex[key] = { best: 1, total: 1 };
+          save();
+          sec.querySelector('.result').innerHTML = '<div class="msg ok">Vergleiche deine Antworten mit den Musterlösungen unter jeder Frage.</div>';
+          return;
+        }
         const prev = store.ex[key];
         store.ex[key] = { best: Math.max(right, prev ? prev.best : 0), total };
         save();

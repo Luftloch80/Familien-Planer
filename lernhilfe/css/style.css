@@ -363,6 +363,8 @@ ol.items > li { margin-bottom: 14px; }
 .q input.num { width: 7em; text-align: right; }
 .unit { font-weight: 600; }
 .hint { color: var(--muted); font-style: italic; }
+.open-answer { display: block; width: 100%; margin: 6px 0 2px; font: inherit; font-size: .95rem; color: var(--text); background: var(--surface); border: 1.5px solid var(--border); border-radius: 9px; padding: 7px 10px; line-height: 1.4; resize: vertical; }
+.open-answer:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .sol { font-size: .92rem; background: var(--ok-bg); color: var(--text); padding: 6px 10px; border-radius: 8px; margin-top: 4px; }
 .choice { display: inline-flex; gap: 4px; vertical-align: middle; }
 .choice button { font: inherit; font-size: .95rem; padding: 2px 12px; border: 1.5px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); cursor: pointer; line-height: 1.8; }
