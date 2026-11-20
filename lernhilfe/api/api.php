@@ -6,9 +6,10 @@
 //                                          -> Fotos auswerten: Fach + Thema erkennen,
 //                                             Lerninhalte erzeugen, als neues Thema
 //                                             speichern oder an ein bestehendes anhängen
+// POST api.php?action=update   {"id":123,"epoche":"…"} -> Epoche/Titel ändern
 // POST api.php?action=delete   {"id":123}  -> Thema löschen
 //
-// analyze und delete verlangen den Zugangscode im Header X-Lernhilfe-Code,
+// analyze, update und delete verlangen den Zugangscode im Header X-Lernhilfe-Code,
 // sofern in config.php einer gesetzt ist.
 
 declare(strict_types=1);
@@ -46,11 +47,11 @@ const FAECHER = [
 
 // Themen, die fest in der Webseite stehen (aus den ersten Lernheften)
 const BASIS_THEMEN = [
-    ['id' => 'mathe-basis', 'fach' => 'mathe', 'titel' => 'Fläche, Volumen, Oberfläche, Einheiten',
+    ['id' => 'mathe-basis', 'fach' => 'mathe', 'epoche' => 'Flächen und Körper', 'titel' => 'Fläche, Volumen, Oberfläche, Einheiten',
         'zusammenfassung' => 'Rechteck, Quadrat, Dreieck (A = g·h:2), zusammengesetzte Flächen, Quader und Würfel (Volumen, Oberfläche), Einheiten umrechnen (Länge, Fläche, Volumen, Ar/Hektar, Liter).'],
-    ['id' => 'englisch-basis', 'fach' => 'englisch', 'titel' => 'Around the World in 80 Days – Kapitel 2',
+    ['id' => 'englisch-basis', 'fach' => 'englisch', 'epoche' => '', 'titel' => 'Around the World in 80 Days – Kapitel 2',
         'zusammenfassung' => 'Vokabeln zu Kapitel 2 „Phileas Fogg makes a bet“ (wealthy, robbery, thief, receipt, reward, bet …), Simple Present, Adverbs, If-Clauses Typ 2.'],
-    ['id' => 'franz-basis', 'fach' => 'franz', 'titel' => 'Vocabulaire Chapitre 1–3 · Le passé récent',
+    ['id' => 'franz-basis', 'fach' => 'franz', 'epoche' => '', 'titel' => 'Vocabulaire Chapitre 1–3 · Le passé récent',
         'zusammenfassung' => 'Vokabeln Chapitre 1 (Ende), Chapitre 2 „Voisins et amis“, Chapitre 3 „Les étrangers“; Grammatik passé récent (venir de + Infinitiv) und Abgrenzung zum futur proche.'],
 ];
 
@@ -142,6 +143,7 @@ function schema(): array
         'thema_id' => ['type' => 'string', 'description' => 'id des passenden bestehenden Themas aus der Liste, oder leerer String bei neuem Thema'],
         'begruendung' => ['type' => 'string', 'description' => 'Ein kurzer Satz für das Kind: woran Fach und Thema erkannt wurden und warum neu bzw. Ergänzung'],
         'titel' => ['type' => 'string', 'description' => 'Kurzer Titel des Themas (bei Ergänzung: Titel des neuen Abschnitts)'],
+        'epoche' => ['type' => 'string', 'description' => 'Name der Epoche (Waldorfschule), z. B. "Geometrie", "Mittelalter", "Pflanzenkunde". Bei Ergänzung die Epoche des bestehenden Themas. Leer bei Fächern ohne Epochenunterricht (meist Fremdsprachen).'],
         'zusammenfassung' => ['type' => 'string', 'description' => 'Ein bis zwei Sätze, worum es geht (für spätere Zuordnung)'],
         'sprache' => ['type' => 'string', 'enum' => ['', 'en', 'fr', 'es', 'la', 'de'], 'description' => 'Sprache der Vokabeln (Fremdsprache), sonst leer'],
         'vokabeln' => ['type' => 'array', 'items' => $obj([
@@ -176,7 +178,7 @@ function systemPrompt(): string
 Du bist eine Lernhilfe für ein Schulkind (etwa Klasse 5–8) in Deutschland. Du bekommst Fotos von Schulmaterial: Arbeitsblätter, Buchseiten, Hefteinträge, Vokabellisten, Tafelbilder.
 
 Deine Aufgaben:
-1. Erkenne das Schulfach.
+1. Erkenne das Schulfach. Das Kind geht auf eine Waldorfschule: Hauptfächer werden in Epochen (mehrwöchigen Blöcken) unterrichtet. Ordne das Thema einer Epoche zu; nutze dafür, wenn passend, eine Epoche, die bei den bestehenden Themen desselben Fachs schon vorkommt, sonst einen kurzen, üblichen Epochennamen.
 2. Entscheide, ob die Fotos zu einem der bestehenden Themen gehören (Liste in der Nachricht). Gehört es zum selben Kapitel, derselben Lektion oder derselben Grammatik wie ein bestehendes Thema, gib dessen id als thema_id an. Ist es ein anderes Kapitel oder ein anderes Stoffgebiet, ist es ein neues Thema: thema_id leer.
 3. Erstelle daraus Lernmaterial auf Deutsch, das dem Kind beim Üben hilft:
    - vokabeln: alle Vokabeln oder Fachbegriffe, die auf den Fotos stehen, genau wie dort geschrieben (mit Accents, Artikeln, "to" bei englischen Verben). Bei Mathe meist leer.
@@ -218,6 +220,7 @@ function analyze(): void
             'id' => (string)$t['id'],
             'fach' => $t['fach'],
             'titel' => $t['titel'],
+            'epoche' => $d['epoche'] ?? '',
             'zusammenfassung' => $d['zusammenfassung'] ?? '',
             'ergaenzt_basis' => $t['basis'] ?? '',
             'vokabeln' => array_slice(array_map(fn ($v) => $v['begriff'], $d['vokabeln'] ?? []), 0, 150),
@@ -348,6 +351,7 @@ function saveResult(array $r, array $themen, int $fotos): array
         $d['stolperfallen'] = array_values(array_unique(array_merge($d['stolperfallen'] ?? [], $neuerTeil['stolperfallen'])));
         $d['uebungen'] = array_merge($d['uebungen'] ?? [], $neuerTeil['uebungen']);
         $d['verlauf'][] = ['datum' => $now, 'fotos' => $fotos, 'titel' => $r['titel']];
+        if (trim((string)($d['epoche'] ?? '')) === '') $d['epoche'] = trim((string)($r['epoche'] ?? ''));
         $stmt = db()->prepare('UPDATE lernhilfe_themen SET data = ? WHERE id = ?');
         $stmt->execute([json_encode($d, JSON_FLAGS), $target['id']]);
         $themaId = $target['id'];
@@ -359,6 +363,7 @@ function saveResult(array $r, array $themen, int $fotos): array
         if ($basis) $fach = explode('-', $basis)[0];
         $d = $neuerTeil + [
             'zusammenfassung' => $r['zusammenfassung'],
+            'epoche' => trim((string)($r['epoche'] ?? '')),
             'sprache' => $r['sprache'] ?? '',
             'verlauf' => [['datum' => $now, 'fotos' => $fotos, 'titel' => $r['titel']]],
         ];
@@ -386,6 +391,25 @@ function saveResult(array $r, array $themen, int $fotos): array
     ];
 }
 
+// Epoche (oder Titel) eines Themas von Hand ändern
+function updateThema(): void
+{
+    requireCode();
+    $body = readJsonBody();
+    $id = (int)($body['id'] ?? 0);
+    if ($id <= 0) fail(400, 'id fehlt');
+    $stmt = db()->prepare('SELECT data, titel FROM lernhilfe_themen WHERE id = ?');
+    $stmt->execute([$id]);
+    $row = $stmt->fetch();
+    if (!$row) fail(404, 'Thema nicht gefunden');
+    $d = json_decode($row['data'], true) ?: [];
+    $titel = $row['titel'];
+    if (array_key_exists('epoche', $body)) $d['epoche'] = mb_substr(trim((string)$body['epoche']), 0, 100);
+    if (isset($body['titel']) && trim((string)$body['titel']) !== '') $titel = mb_substr(trim((string)$body['titel']), 0, 255);
+    db()->prepare('UPDATE lernhilfe_themen SET data = ?, titel = ? WHERE id = ?')->execute([json_encode($d, JSON_FLAGS), $titel, $id]);
+    echo json_encode(['ok' => true, 'themen' => loadThemen()], JSON_FLAGS);
+}
+
 function deleteThema(): void
 {
     requireCode();
@@ -403,6 +427,8 @@ try {
         echo json_encode(['themen' => loadThemen(), 'code' => (string)(config()['code'] ?? '') !== ''], JSON_FLAGS);
     } elseif ($action === 'analyze' && $method === 'POST') {
         analyze();
+    } elseif ($action === 'update' && $method === 'POST') {
+        updateThema();
     } elseif ($action === 'delete' && $method === 'POST') {
         deleteThema();
     } else {

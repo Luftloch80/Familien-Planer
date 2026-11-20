@@ -124,7 +124,7 @@
   // ---------- Vokabel-Daten ----------
   function allWords(subj, group) {
     const out = [];
-    subj.vocabGroups.forEach((g, gi) => {
+    (subj.vocabGroups || []).forEach((g, gi) => {
       if (group != null && group !== 'all' && +group !== gi) return;
       g.words.forEach((w) => out.push({ fr: w[0], de: w[1], ex: w[2], key: subj.id + '|' + w[0], group: gi }));
     });
@@ -322,7 +322,6 @@
     if (!side) return;
     const list = faecherList();
     if (currentFach && !list.includes(currentFach)) currentFach = '';
-    const topics = currentFach ? topicsOf(currentFach) : [];
     const here = activeRoute || location.hash;
     side.innerHTML = `
       <a class="side-photo ${!here || here === '#/' ? 'active' : ''}" href="#/">📷 Neue Fotos</a>
@@ -333,7 +332,8 @@
       </select>
       ${currentFach ? `<nav class="side-topics" aria-label="Themen">
         <a href="#/f/${currentFach}" class="${here === '#/f/' + currentFach ? 'active' : ''}">Alle Themen in ${esc(fachName(currentFach))}</a>
-        ${topics.map((x) => `<a href="${x.subj.route}" class="${here.startsWith(x.subj.route + '/') || here === x.subj.route ? 'active' : ''}">${esc(x.title)}${x.builtin ? '' : x.t.basis ? ' <span class="tag">Ergänzung</span>' : ''}</a>`).join('')}
+        ${epochenOf(currentFach).map((g) => `<div class="side-epoche">${g.name ? esc(g.name) : 'Ohne Epoche'}</div>` +
+          g.topics.map((x) => `<a href="${x.subj.route}" class="${here.startsWith(x.subj.route + '/') || here === x.subj.route ? 'active' : ''}">${esc(x.title)}${x.builtin ? '' : x.t.basis ? ' <span class="tag">Ergänzung</span>' : ''}</a>`).join('')).join('')}
       </nav>` : ''}`;
     side.querySelector('#fachSel').addEventListener('change', (e) => {
       currentFach = e.target.value;
@@ -352,6 +352,11 @@
       store.prefs.fach = currentFach; save();
       renderSide();
       return renderFach(parts[1]);
+    }
+    if (parts[0] === 'druck' && parts[1]) {
+      currentFach = parts[1];
+      renderSide();
+      return renderPrint(parts[1], parts[2] || '-');
     }
     if (parts[0] === 't' && parts[1]) {
       const t = remote.find((x) => String(x.id) === parts[1]);
@@ -386,6 +391,140 @@
     return t;
   }
 
+  // ---------- Epochen ----------
+  const BUILTIN_EPOCHE = { mathe: 'Flächen und Körper', englisch: '', franz: '' };
+  const OHNE_EPOCHE = 'Fachunterricht (ohne Epoche)';
+  const epocheOf = (x) => (x.builtin ? BUILTIN_EPOCHE[x.subj.id] : ((x.t && x.t.data && x.t.data.epoche) || '')).trim();
+  const epocheKey = (e) => (e ? encodeURIComponent(e) : '-');
+  function epochenOf(fach) {
+    const groups = new Map();
+    topicsOf(fach).forEach((x) => {
+      const e = epocheOf(x);
+      if (!groups.has(e)) groups.set(e, []);
+      groups.get(e).push(x);
+    });
+    // Benannte Epochen zuerst (alphabetisch), ohne Epoche zuletzt
+    return Array.from(groups.entries())
+      .sort((a, b) => (!a[0]) - (!b[0]) || a[0].localeCompare(b[0], 'de'))
+      .map(([name, topics]) => ({ name, topics }));
+  }
+  const printLink = (fach, e) => `#/druck/${fach}/${epocheKey(e)}`;
+
+  async function apiPost(action, body) {
+    const send = () => fetch(API + '?action=' + action, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Lernhilfe-Code': store.prefs.code || '' },
+      body: JSON.stringify(body),
+    });
+    let r = await send();
+    if (r.status === 401) {
+      const c = prompt('Zugangscode:');
+      if (!c) throw new Error('Kein Zugangscode');
+      store.prefs.code = c.trim(); save();
+      r = await send();
+    }
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || 'Fehler ' + r.status);
+    if (d.themen) setRemote(d.themen);
+    return d;
+  }
+
+  // ---------- Druckansicht (Lernheft als PDF) ----------
+  function printBlank(spec) {
+    if (typeof spec === 'object' && !Array.isArray(spec)) {
+      return `<span class="pblank num"></span>${spec.u ? ' ' + spec.u : ''}`;
+    }
+    const len = Math.max(...spec.map((s) => s.length));
+    return `<span class="pblank ${len > 22 ? 'wide' : ''}" style="${len > 22 ? '' : `min-width:${Math.max(6, len + 3)}ch`}"></span>`;
+  }
+
+  function renderPrint(fach, key) {
+    const epoche = key === '-' ? '' : decodeURIComponent(key);
+    const group = epochenOf(fach).find((g) => g.name === epoche);
+    const topics = group ? group.topics : [];
+    const opt = Object.assign({ wissen: true, vokabeln: true, test: true, uebungen: true, loesungen: true }, store.prefs.print || {});
+    const eName = epoche || OHNE_EPOCHE;
+    const docTitle = `Lernheft ${fachName(fach)} – ${eName}`;
+    document.title = docTitle;
+    document.body.dataset.subject = ORDER.includes(fach) ? fach : '';
+
+    let exNo = 0;
+    const solutions = [];
+    const body = topics.map((x, ti) => {
+      const s = x.subj;
+      let h = `<section class="p-topic ${ti ? 'p-break' : ''}"><h2>${esc(x.title)}</h2>`;
+      if (opt.wissen && s.grammar && s.grammar.length) {
+        h += s.grammar.map((g) => `<div class="p-block"><h3>${esc(g.title)}</h3>${g.html}</div>`).join('');
+      }
+      if (opt.wissen && s.pitfalls && s.pitfalls.length) {
+        h += `<div class="p-block warn"><h3>Stolperfallen</h3><ul>${s.pitfalls.map((p) => `<li>${s.remote ? esc(p) : p}</li>`).join('')}</ul></div>`;
+      }
+      const words = allWords(s);
+      if (opt.vokabeln && words.length) {
+        h += `<div class="p-block"><h3>Vokabeln</h3><table class="p-vocab"><thead><tr><th>#</th><th>${esc(s.langLabel)}</th><th>${esc(deL(s))}</th></tr></thead><tbody>
+          ${words.map((w, i) => `<tr><td>${i + 1}</td><td>${esc(w.fr)}</td><td>${esc(w.de)}${w.ex ? `<br><small>${esc(w.ex)}</small>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+      }
+      if (opt.test && words.length) {
+        const half = Math.ceil(words.length / 2);
+        const left = words.slice(0, half), right = words.slice(half);
+        const rows = [];
+        for (let i = 0; i < half; i++) {
+          const r = right[i];
+          rows.push(`<tr><td>${esc(left[i].fr)}</td><td class="line"></td><td class="gap"></td>${r ? `<td>${esc(r.de)}</td><td class="line"></td>` : '<td></td><td></td>'}</tr>`);
+        }
+        h += `<div class="p-block p-test"><h3>Abdecktest</h3><p class="p-hint">Schreib die Übersetzung in die leere Spalte. Danach mit der Vokabelliste vergleichen.</p>
+          <table><thead><tr><th>${esc(s.langLabel)}</th><th>${esc(deL(s))}</th><th class="gap"></th><th>${esc(deL(s))}</th><th>${esc(s.langLabel)}</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+      }
+      if (opt.uebungen && s.exercises && s.exercises.length) {
+        const sol = [];
+        h += s.exercises.map((ex) => {
+          exNo++;
+          sol.push(`<p><b>${exNo}. ${esc(ex.title)}</b><br>${ex.items.map((it, i) => `${i + 1}) ${solutionText(it)}`).join(' · ')}</p>`);
+          return `<div class="p-block p-ex"><h3>${exNo}. ${esc(ex.title)}</h3>${ex.intro ? `<p class="p-hint">${esc(ex.intro)}</p>` : ''}
+            ${ex.wordbox ? `<p class="p-wordbox">${ex.wordbox.map(esc).join(' · ')}</p>` : ''}
+            <ol>${ex.items.map((it) => {
+              let bi = 0;
+              const q = it.choice
+                ? esc(it.q).replace('___', `( ${it.choice.map(esc).join(' / ')} )`)
+                : esc(it.q).replace(/___/g, () => printBlank(it.a[bi++]));
+              return `<li>${it.fig ? `<div class="p-fig">${it.fig}</div>` : ''}${q}${it.hint ? ` <i>(${esc(it.hint)})</i>` : ''}</li>`;
+            }).join('')}</ol></div>`;
+        }).join('');
+        solutions.push(`<h3>${esc(x.title)}</h3>${sol.join('')}`);
+      }
+      return h + '</section>';
+    }).join('');
+
+    app.innerHTML = `
+      <div class="print-tools card">
+        <nav class="crumbs"><a href="#/f/${fach}">← ${esc(fachName(fach))}</a></nav>
+        <h1>🖨️ Lernheft drucken</h1>
+        <p>${fachIcon(fach)} <b>${esc(fachName(fach))}</b> · ${epoche ? 'Epoche' : ''} <b>${esc(eName)}</b> · ${topics.length} ${topics.length === 1 ? 'Thema' : 'Themen'}</p>
+        <div class="print-opts">
+          ${[['wissen', 'Erklärungen'], ['vokabeln', 'Vokabelliste'], ['test', 'Abdecktest'], ['uebungen', 'Übungen'], ['loesungen', 'Lösungen am Ende']]
+            .map(([k, l]) => `<label><input type="checkbox" data-opt="${k}" ${opt[k] ? 'checked' : ''}> ${l}</label>`).join('')}
+        </div>
+        <div class="actions"><button class="btn primary" id="doPrint">🖨️ Drucken / als PDF speichern</button></div>
+        <p class="muted small">Im Druckdialog als Drucker „Als PDF speichern“ wählen, um eine PDF-Datei zu bekommen.</p>
+      </div>
+      <article class="print-doc">
+        <header class="p-cover">
+          <div class="p-kicker">Lernheft · ${esc(fachName(fach))}</div>
+          <h1>${esc(eName)}</h1>
+          <div class="p-name">Name: <span></span> Datum: <span></span></div>
+          ${topics.length > 1 ? `<ol class="p-toc">${topics.map((x) => `<li>${esc(x.title)}</li>`).join('')}</ol>` : ''}
+        </header>
+        ${body || '<p>Keine Themen in dieser Epoche.</p>'}
+        ${opt.loesungen && solutions.length ? `<section class="p-solutions p-break"><h2>Lösungen</h2>${solutions.join('')}</section>` : ''}
+      </article>`;
+    app.querySelectorAll('[data-opt]').forEach((c) => c.addEventListener('change', () => {
+      store.prefs.print = Object.assign({}, opt, { [c.dataset.opt]: c.checked });
+      save();
+      renderPrint(fach, key);
+    }));
+    app.querySelector('#doPrint').addEventListener('click', () => window.print());
+  }
+
   // ---------- Fach-Übersicht ----------
   function renderFach(fach) {
     document.title = `${fachName(fach)} – Lernhilfe`;
@@ -396,7 +535,13 @@
         <span class="subject-icon" aria-hidden="true">${fachIcon(fach)}</span>
         <div><h1>${esc(fachName(fach))}</h1><p>${topics.length} ${topics.length === 1 ? 'Thema' : 'Themen'}</p></div>
       </header>
-      <div class="topic-list">${topics.map((x) => topicCard(x)).join('') || '<p class="muted">Noch keine Themen.</p>'}</div>
+      ${epochenOf(fach).map((g) => `<section class="epoche">
+        <div class="epoche-head">
+          <h2>${g.name ? 'Epoche: ' + esc(g.name) : esc(OHNE_EPOCHE)}</h2>
+          <a class="btn" href="${printLink(fach, g.name)}" title="Alle Themen dieser Epoche als Lernheft drucken oder als PDF speichern">🖨️ Lern-PDF drucken</a>
+        </div>
+        <div class="topic-list">${g.topics.map((x) => topicCard(x)).join('')}</div>
+      </section>`).join('') || '<p class="muted">Noch keine Themen.</p>'}
       <a class="btn" href="#/">📷 Neue Fotos zu ${esc(fachName(fach))} hinzufügen</a>`;
   }
   function topicCard(x) {
@@ -594,9 +739,17 @@
       <div class="tabs" role="tablist">${tabs.map(([id, label]) =>
         `<a role="tab" href="${subj.route}/${id}" class="${id === tab ? 'active' : ''}" aria-selected="${id === tab}">${label}</a>`).join('')}</div>
       <div id="view"></div>
-      ${t ? `<footer class="topic-foot muted small">
-        Aus ${verlauf.reduce((n, v) => n + (v.fotos || 0), 0)} Fotos erstellt${verlauf.length > 1 ? ` (${verlauf.length} Auswertungen)` : ''}.
-        <button type="button" class="link" id="delTopic">Thema löschen</button></footer>` : ''}`;
+      <footer class="topic-foot">
+        ${t ? `<form class="epoche-form" id="epForm">
+          <label for="epIn">Epoche</label>
+          <input type="text" id="epIn" list="epList" value="${esc((t.data && t.data.epoche) || '')}" placeholder="z. B. Geometrie" maxlength="100">
+          <datalist id="epList">${epochenOf(subj.fach).filter((g) => g.name).map((g) => `<option value="${esc(g.name)}">`).join('')}</datalist>
+          <button class="btn" type="submit">Speichern</button>
+        </form>` : ''}
+        <a class="btn" href="${printLink(subj.fach, epocheOf(t ? { t } : { builtin: true, subj }))}">🖨️ Lern-PDF dieser Epoche</a>
+        ${t ? `<p class="muted small">Aus ${verlauf.reduce((n, v) => n + (v.fotos || 0), 0)} Fotos erstellt${verlauf.length > 1 ? ` (${verlauf.length} Auswertungen)` : ''}.
+        <button type="button" class="link" id="delTopic">Thema löschen</button></p>` : ''}
+      </footer>`;
     const view = document.getElementById('view');
     ({
       vokabeln: renderVocabList,
@@ -608,6 +761,20 @@
       training: renderTraining,
       leer: (s, v) => { v.innerHTML = '<p class="muted">Zu diesem Thema gibt es noch keine Inhalte.</p>'; },
     })[tab](subj, view);
+    const epForm = document.getElementById('epForm');
+    if (epForm) epForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = epForm.querySelector('button');
+      btn.disabled = true;
+      try {
+        await apiPost('update', { id: t.id, epoche: epForm.querySelector('input').value });
+        btn.textContent = '✔ Gespeichert';
+        renderSide();
+      } catch (err) {
+        alert('Speichern hat nicht geklappt: ' + err.message);
+      }
+      btn.disabled = false;
+    });
     const del = document.getElementById('delTopic');
     if (del) del.addEventListener('click', () => deleteTopic(subj));
     const active = app.querySelector('.tabs .active');
