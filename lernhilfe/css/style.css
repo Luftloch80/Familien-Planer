@@ -101,7 +101,7 @@ main { width: 100%; max-width: 920px; margin: 0 auto; padding: 20px 16px 40px; f
 .menu-btn { display: none; border: 0; background: none; color: var(--text); padding: 6px; margin: -6px 0 -6px -6px; border-radius: 8px; cursor: pointer; }
 .menu-btn:hover { background: var(--surface-2); }
 .backdrop { display: none; }
-.top { justify-content: flex-start; }
+.top { justify-content: flex-start; min-height: 53px; }
 @media (max-width: 820px) {
   .layout { display: block; }
   .menu-btn { display: inline-flex; }
@@ -130,7 +130,7 @@ main { width: 100%; max-width: 920px; margin: 0 auto; padding: 20px 16px 40px; f
 .avatar.sm { width: 30px; height: 30px; font-size: .78rem; }
 .avatar.xs { width: 24px; height: 24px; font-size: .65rem; }
 .avatar.lg { width: 84px; height: 84px; font-size: 1.8rem; box-shadow: 0 4px 14px rgba(0,0,0,.15); }
-.no-user .side, .no-user .menu-btn, .no-user .backdrop { display: none !important; }
+.no-user .side, .no-user .menu-btn, .no-user .backdrop, .no-user .top { display: none !important; }
 .no-user main { max-width: 640px; }
 .login { text-align: center; padding: 24px 0; display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .login h1 { font-size: 2rem; margin: 0; }
