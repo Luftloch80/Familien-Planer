@@ -475,7 +475,7 @@
       </div>
       <nav class="nav-list" aria-label="Hauptmenü">
         <a href="#/" class="${here === '#/' ? 'active' : ''}"><span class="ni" aria-hidden="true">🏠</span>Übersicht</a>
-        ${FOTOS_AKTIV ? `<a href="#/fotos" class="${here === '#/fotos' ? 'active' : ''}"><span class="ni" aria-hidden="true">📷</span>Neue Fotos</a>` : ''}
+        ${FOTOS_AKTIV ? `<a href="#/fotos" class="${here === '#/fotos' ? 'active' : ''}"><span class="ni" aria-hidden="true">📷</span>Neues Material</a>` : ''}
         ${isAdmin() ? `<a href="#/admin" class="${here === '#/admin' ? 'active' : ''}"><span class="ni" aria-hidden="true">⚙️</span>Benutzer verwalten</a>` : ''}
       </nav>
       <div class="nav-sep"></div>
@@ -704,7 +704,7 @@
         </div>
         <div class="topic-list">${g.topics.map((x) => topicCard(x)).join('')}</div>
       </section>`).join('') || '<p class="muted">Noch keine Themen.</p>'}
-      ${FOTOS_AKTIV ? `<a class="btn" href="#/fotos">📷 Neue Fotos zu ${esc(fachName(fach))} hinzufügen</a>` : ''}`;
+      ${FOTOS_AKTIV ? `<a class="btn" href="#/fotos">📷 Neues Material zu ${esc(fachName(fach))} hinzufügen</a>` : ''}`;
   }
   function topicCard(x) {
     const p = progressOf(x.subj);
@@ -1132,7 +1132,7 @@
         <p>Such dir ein Thema aus und leg los. Pro Epoche kannst du dir ein Lernheft als PDF drucken.</p>
         <div class="actions">
           ${angefangen.length ? `<a class="btn primary" href="${angefangen[0].subj.route}">▶ Weiterlernen</a>` : ''}
-          ${FOTOS_AKTIV ? `<a class="btn" href="#/fotos">📷 Neue Fotos</a>` : ''}
+          ${FOTOS_AKTIV ? `<a class="btn" href="#/fotos">📷 Neues Material</a>` : ''}
         </div>
       </section>
       ${row('Weiterlernen', '', angefangen)}
@@ -1170,7 +1170,7 @@
     }
     app.innerHTML = `
       <section class="hero small-hero">
-        <h1>Neue Fotos</h1>
+        <h1>Neues Material</h1>
         <p>Fotografiere Arbeitsblätter, Buchseiten oder Hefteinträge. Lernflix erkennt automatisch das Fach und ob es ein neues Thema ist – und macht daraus Vokabeln, Erklärungen und Übungen.</p>
       </section>
       <section class="card photo-card">
