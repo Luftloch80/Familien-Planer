@@ -150,6 +150,35 @@ main { width: 100%; max-width: 920px; margin: 0 auto; padding: 20px 16px 40px; f
 .add-row input { flex: 1; min-width: 0; font-size: 1.05rem; }
 @media (max-width: 520px) { .user-name { display: none; } .user-btn { padding: 3px; } }
 
+/* Nutzer-Menü, Anmeldung, Verwaltung */
+.user-box { position: relative; }
+.user-menu {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 40; min-width: 240px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 8px;
+}
+.user-menu-head { display: flex; gap: 10px; align-items: center; padding: 8px 8px 12px; border-bottom: 1px solid var(--border); margin-bottom: 6px; }
+.um-item { display: block; width: 100%; text-align: left; border: 0; background: none; font: inherit; color: var(--text); padding: 10px 10px; border-radius: 9px; cursor: pointer; text-decoration: none; }
+.um-item:hover { background: var(--surface-2); }
+.kid.static { cursor: default; }
+.kid.static:hover { background: none; box-shadow: none; }
+.add-kid .full, .stack .full { width: 100%; margin-bottom: 10px; font-size: 1.05rem; }
+.add-kid .btn.full { margin: 4px 0 8px; }
+.add-kid .link { display: block; margin: 0 auto; }
+.first-login { background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; margin: 0 0 12px; font-size: .95rem; }
+.login #lgMsg { width: 100%; max-width: 380px; }
+.card.narrow { max-width: 440px; }
+.stack { display: flex; flex-direction: column; gap: 4px; }
+.stack label { font-weight: 600; font-size: .9rem; }
+.stack .btn { align-self: flex-start; margin-top: 6px; }
+.add-row.wrap { flex-wrap: wrap; }
+.add-row.wrap input { flex: 1 1 180px; }
+.user-list { display: grid; gap: 12px; }
+.user-card { margin-bottom: 0; }
+.uc-head { display: flex; gap: 12px; align-items: center; }
+.uc-name { display: flex; flex-direction: column; gap: 2px; }
+.user-card .actions { margin-top: 12px; }
+.user-card .btn { font-size: .88rem; padding: 7px 12px; }
+
 /* Fotos */
 .small-hero { padding: 8px 0 4px; }
 .small-hero h1 { font-size: 1.9rem; }

@@ -87,6 +87,14 @@ Zusätzliche Secrets:
 | `ANTHROPIC_API_KEY` | API-Schlüssel von console.anthropic.com (für die Fotoerkennung) |
 | `LERNHILFE_CODE` | Zugangscode, den man beim ersten Auswerten eingibt (empfohlen, sonst kann jeder mit dem Link auf deine Kosten Fotos auswerten lassen) |
 
+**Anmeldung:** Kinder und Admins melden sich mit Name und Passwort an. Das
+Passwort legt jeder beim ersten Anmelden selbst fest. Beim allerersten Aufruf
+legt der Server automatisch den Benutzer **„Admin“** an; dessen erstes Passwort
+lässt sich nur zusammen mit dem Zugangscode (`LERNHILFE_CODE`) festlegen. Über
+„Benutzer verwalten“ (Menü oben rechts) legt der Admin Kinder an, benennt sie
+um, setzt Passwörter zurück oder löscht sie. Tabellen: `lernhilfe_kinder`,
+`lernhilfe_sessions`.
+
 Die Themen aus den Fotos landen in der Tabelle `lernhilfe_themen` derselben
 Datenbank wie der Familienplaner (wird automatisch angelegt). Die Fotos selbst
 werden nicht gespeichert. Strato muss für die Domain PHP 8.1 oder neuer nutzen

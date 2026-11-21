@@ -5,42 +5,64 @@
   const ORDER = ['mathe', 'englisch', 'franz'];
   const app = document.getElementById('app');
 
-  // ---------- Kinder & Lernstand ----------
-  // Jedes Kind hat seinen eigenen Lernstand. Angemeldet wird nur mit dem Namen.
-  // Gespeichert wird sofort auf dem Gerät und im Hintergrund in der Datenbank
-  // (api/lernstand.php), damit der Stand auf allen Geräten gleich ist.
-  const PKEY = 'lernhilfe:kinder';
-  const OLD_KEY = 'lernhilfe:v1';
+  // ---------- Anmeldung & Lernstand ----------
+  // Anmeldung mit Name und Passwort (das Passwort legt jedes Kind beim ersten
+  // Anmelden selbst fest). Der Lernstand wird sofort auf dem Gerät und im
+  // Hintergrund in der Datenbank gespeichert (api/lernstand.php).
+  const AKEY = 'lernhilfe:auth';
+  const DKEY = 'lernhilfe:geraet';
   const SYNC_API = 'api/lernstand.php';
-  const COLORS = ['#e8590c', '#1c7ed6', '#2b8a3e', '#d6336c', '#7048e8', '#0c8599', '#f08c00', '#c2255c'];
-  let profiles = { list: [], current: null, rev: {} };
-  try { profiles = Object.assign(profiles, JSON.parse(localStorage.getItem(PKEY) || '{}')); } catch (e) { /* egal */ }
-  if (!profiles.rev) profiles.rev = {};
+  let auth = null; // { token, kid: { id, name, color, rolle }, rev }
+  try { auth = JSON.parse(localStorage.getItem(AKEY) || 'null'); } catch (e) { auth = null; }
+  try { localStorage.removeItem('lernhilfe:kinder'); } catch (e) { /* alte Version */ }
   const keyFor = (id) => 'lernhilfe:v1:' + id;
-  const currentKid = () => profiles.list.find((k) => k.id === profiles.current) || null;
-  function saveProfiles() {
-    try { localStorage.setItem(PKEY, JSON.stringify(profiles)); } catch (e) { /* egal */ }
+  const currentKid = () => (auth && auth.token && auth.kid) || null;
+  const isAdmin = () => !!(currentKid() && currentKid().rolle === 'admin');
+  function saveAuth() {
+    try { if (auth) localStorage.setItem(AKEY, JSON.stringify(auth)); else localStorage.removeItem(AKEY); } catch (e) { /* egal */ }
   }
+  // Namen, die sich auf diesem Gerät schon angemeldet haben (für die Anmeldeseite)
+  function deviceNames() {
+    try { return JSON.parse(localStorage.getItem(DKEY) || '[]') || []; } catch (e) { return []; }
+  }
+  function rememberName(k) {
+    const list = deviceNames().filter((x) => x.name.toLowerCase() !== k.name.toLowerCase());
+    list.unshift({ name: k.name, color: k.color });
+    try { localStorage.setItem(DKEY, JSON.stringify(list.slice(0, 8))); } catch (e) { /* egal */ }
+  }
+  function authHeaders() {
+    const h = {};
+    if (auth && auth.token) h['X-Lernhilfe-Token'] = auth.token;
+    if (store && store.prefs && store.prefs.code) h['X-Lernhilfe-Code'] = store.prefs.code;
+    return h;
+  }
+
   const emptyStore = () => ({ vocab: {}, vt: {}, ex: {}, prefs: {}, _reset: 0 });
+  // PHP liefert leere Objekte als [] zurück – wieder zu Objekten machen
+  function normStore(d) {
+    const out = Object.assign(emptyStore(), d && typeof d === 'object' && !Array.isArray(d) ? d : {});
+    ['vocab', 'vt', 'ex', 'prefs'].forEach((k) => { if (!out[k] || typeof out[k] !== 'object' || Array.isArray(out[k])) out[k] = {}; });
+    return out;
+  }
   let store = emptyStore();
   function readLocal(id) {
     try {
       const raw = localStorage.getItem(keyFor(id));
-      return Object.assign(emptyStore(), raw ? JSON.parse(raw) : {});
+      return normStore(raw ? JSON.parse(raw) : {});
     } catch (e) { return emptyStore(); }
   }
   function writeLocal(id, data) {
     try { localStorage.setItem(keyFor(id), JSON.stringify(data)); } catch (e) { /* egal */ }
   }
   function loadStore() {
-    store = currentKid() ? readLocal(profiles.current) : emptyStore();
+    store = currentKid() ? readLocal(currentKid().id) : emptyStore();
   }
   // Fingerabdruck nur des Lernfortschritts (nicht der Anzeige-Einstellungen)
   const progressFp = (d) => JSON.stringify([d._reset || 0, Object.entries(d.vocab || {}).sort(), Object.entries(d.ex || {}).sort()]);
   let lastFp = '';
   function save() {
     if (!currentKid()) return;
-    writeLocal(profiles.current, store);
+    writeLocal(currentKid().id, store);
     const fp = progressFp(store);
     if (fp !== lastFp) { lastFp = fp; scheduleSync(); }
   }
@@ -50,8 +72,8 @@
   // Zwei Stände zusammenführen: pro Vokabel gewinnt die neuere Antwort,
   // bei Übungen das beste Ergebnis. Nach "Lernstand zurücksetzen" gewinnt der neuere Neustart.
   function mergeStores(a, b) {
-    a = Object.assign(emptyStore(), a || {});
-    b = Object.assign(emptyStore(), b || {});
+    a = normStore(a);
+    b = normStore(b);
     if ((a._reset || 0) !== (b._reset || 0)) return JSON.parse(JSON.stringify((a._reset || 0) > (b._reset || 0) ? a : b));
     const out = emptyStore();
     out._reset = a._reset || 0;
@@ -70,16 +92,17 @@
     return out;
   }
 
-  async function syncCall(method, action, body, query) {
-    const r = await fetch(`${SYNC_API}?action=${action}${query || ''}`, {
+  async function syncCall(method, action, body) {
+    const r = await fetch(`${SYNC_API}?action=${action}`, {
       method,
       cache: 'no-store',
-      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      headers: Object.assign(body ? { 'Content-Type': 'application/json' } : {}, authHeaders()),
       body: body ? JSON.stringify(body) : undefined,
     });
     const d = await r.json().catch(() => ({}));
-    if (r.status === 409) return { conflict: true, kind: d.kind };
-    if (!r.ok) throw new Error(d.error || 'Fehler ' + r.status);
+    if (r.status === 409 && d.kind) return { conflict: true, kind: d.kind };
+    if (r.status === 401 && d.abgemeldet && auth) { forceLogout(); throw new Error(d.error || 'Bitte neu anmelden'); }
+    if (!r.ok) { const e = new Error(d.error || 'Fehler ' + r.status); e.status = r.status; throw e; }
     return d;
   }
 
@@ -91,36 +114,37 @@
     syncTimer = setTimeout(() => syncKid(), 1200);
   }
   // Lernstand des angemeldeten Kindes mit der Datenbank abgleichen
-  async function syncKid() {
+  async function syncKid(serverKid) {
     if (syncing) { syncAgain = true; return syncing; }
-    const id = profiles.current;
-    if (!id) return;
+    const k = currentKid();
+    if (!k) return;
     syncing = (async () => {
+      await null; // erst nach der Zuweisung von "syncing" weiterlaufen
       try {
-        let server = (await syncCall('GET', 'get', null, '&id=' + encodeURIComponent(id))).kind;
+        let server = serverKid || (await syncCall('GET', 'get')).kind;
         for (let i = 0; i < 4; i++) {
-          if (profiles.current !== id) return;
+          if (!currentKid() || currentKid().id !== k.id) return;
           const before = progressFp(store);
           const merged = mergeStores(store, server.data);
-          const changedHere = progressFp(merged) !== before;
           store = merged;
-          writeLocal(id, store);
+          writeLocal(k.id, store);
           lastFp = progressFp(store);
-          profiles.rev[id] = server.ts;
-          saveProfiles();
-          if (changedHere) refreshView();
-          if (progressFp(merged) === progressFp(Object.assign(emptyStore(), server.data))) break;
-          const res = await syncCall('POST', 'save', { id, base: server.ts, data: merged });
-          if (!res.conflict) { profiles.rev[id] = res.ts; saveProfiles(); break; }
+          if (progressFp(merged) !== before) refreshView();
+          if (progressFp(merged) === progressFp(normStore(server.data))) break;
+          const res = await syncCall('POST', 'save', { base: server.ts, data: merged });
+          if (!res.conflict) break;
           server = res.kind;
+        }
+        // Name/Farbe/Rolle könnten sich geändert haben
+        if (server && auth && auth.kid && (auth.kid.name !== server.name || auth.kid.rolle !== server.rolle || auth.kid.color !== server.color)) {
+          Object.assign(auth.kid, { name: server.name, rolle: server.rolle, color: server.color });
+          saveAuth();
+          renderUser();
+          renderSide();
         }
         setSyncState('ok');
       } catch (e) {
-        if (/nicht gefunden/.test(e.message)) {
-          // Kind gibt es auf dem Server nicht (mehr): neu anlegen und erneut versuchen
-          const k = currentKid();
-          if (k) { try { await syncCall('POST', 'add', { id: k.id, name: k.name, color: k.color }); syncAgain = true; } catch (e2) { /* offline */ } }
-        } else setSyncState('offline');
+        if (currentKid()) setSyncState('offline');
       } finally {
         syncing = null;
         if (syncAgain) { syncAgain = false; scheduleSync(); }
@@ -138,60 +162,6 @@
     syncState = st;
     const el = document.getElementById('userBtn');
     if (el) el.classList.toggle('offline', st === 'offline');
-  }
-
-  // Kinderliste mit der Datenbank abgleichen
-  async function syncKids() {
-    let server;
-    try { server = (await syncCall('GET', 'kinder')).kinder || []; } catch (e) { setSyncState('offline'); return; }
-    let changed = false;
-    // lokale Kinder ohne Server-Eintrag hochladen (bzw. per Name zuordnen)
-    for (const k of profiles.list.slice()) {
-      if (server.some((x) => x.id === k.id)) continue;
-      const same = server.find((x) => x.name.toLowerCase() === k.name.toLowerCase());
-      if (same) {
-        renameKid(k.id, same.id);
-        changed = true;
-        continue;
-      }
-      if (k.synced) {
-        // wurde auf einem anderen Gerät entfernt
-        profiles.list = profiles.list.filter((x) => x.id !== k.id);
-        if (profiles.current === k.id) { profiles.current = null; loadStore(); }
-        changed = true;
-        continue;
-      }
-      try {
-        const res = await syncCall('POST', 'add', { id: k.id, name: k.name, color: k.color });
-        if (res.kind.id !== k.id) renameKid(k.id, res.kind.id);
-        server.push(res.kind);
-      } catch (e) { /* später nochmal */ }
-    }
-    // Kinder vom Server übernehmen
-    server.forEach((x) => {
-      const k = profiles.list.find((y) => y.id === x.id);
-      if (!k) { profiles.list.push({ id: x.id, name: x.name, color: x.color, synced: true }); changed = true; }
-      else if (!k.synced || k.name !== x.name || k.color !== x.color) { Object.assign(k, { name: x.name, color: x.color, synced: true }); changed = true; }
-    });
-    saveProfiles();
-    setSyncState('ok');
-    if (changed && !currentKid() && typeof route === 'function') route(true);
-  }
-  function renameKid(oldId, newId) {
-    const k = profiles.list.find((x) => x.id === oldId);
-    if (!k) return;
-    if (profiles.list.some((x) => x.id === newId)) {
-      // beide Einträge zusammenführen
-      writeLocal(newId, mergeStores(readLocal(newId), readLocal(oldId)));
-      profiles.list = profiles.list.filter((x) => x.id !== oldId);
-    } else {
-      writeLocal(newId, readLocal(oldId));
-      k.id = newId;
-      k.synced = true;
-    }
-    try { localStorage.removeItem(keyFor(oldId)); } catch (e) { /* egal */ }
-    if (profiles.current === oldId) { profiles.current = newId; loadStore(); }
-    saveProfiles();
   }
 
   // ---------- Hilfsfunktionen ----------
@@ -514,6 +484,7 @@
       <nav class="nav-list" aria-label="Hauptmenü">
         <a href="#/" class="${here === '#/' ? 'active' : ''}"><span class="ni" aria-hidden="true">🏠</span>Übersicht</a>
         ${FOTOS_AKTIV ? `<a href="#/fotos" class="${here === '#/fotos' ? 'active' : ''}"><span class="ni" aria-hidden="true">📷</span>Neue Fotos</a>` : ''}
+        ${isAdmin() ? `<a href="#/admin" class="${here === '#/admin' ? 'active' : ''}"><span class="ni" aria-hidden="true">⚙️</span>Benutzer verwalten</a>` : ''}
       </nav>
       <div class="nav-sep"></div>
       <div class="nav-title">Fächer</div>
@@ -570,6 +541,8 @@
       subj = L[parts[0]];
       tabPart = parts[1];
     }
+    if (parts[0] === 'admin') { renderSide('#/admin'); return renderAdmin(); }
+    if (parts[0] === 'passwort') { renderSide(''); return renderPasswort(); }
     if (parts[0] === 'fotos' && FOTOS_AKTIV) { renderSide('#/fotos'); return renderFotos(); }
     if (!subj) { renderSide('#/'); return renderStart(); }
     currentFach = subj.fach;
@@ -613,7 +586,7 @@
   async function apiPost(action, body) {
     const send = () => fetch(API + '?action=' + action, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Lernhilfe-Code': store.prefs.code || '' },
+      headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
       body: JSON.stringify(body),
     });
     let r = await send();
@@ -764,109 +737,278 @@
 
   // ---------- Anmeldung ----------
   const initials = (n) => n.trim().split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-  const avatar = (k, cls = '') => `<span class="avatar ${cls}" style="background:${k.color}" aria-hidden="true">${esc(initials(k.name))}</span>`;
+  const avatar = (k, cls = '') => `<span class="avatar ${cls}" style="background:${esc(k.color || '#868e96')}" aria-hidden="true">${esc(initials(k.name))}</span>`;
 
-  function login(id) {
-    profiles.current = id;
-    saveProfiles();
+  function onLoggedIn(res) {
+    auth = { token: res.token, kid: { id: res.kind.id, name: res.kind.name, color: res.kind.color, rolle: res.kind.rolle } };
+    saveAuth();
+    rememberName(auth.kid);
     loadStore();
+    store = mergeStores(store, res.kind.data);
+    writeLocal(auth.kid.id, store);
     lastFp = progressFp(store);
     currentFach = store.prefs.fach || '';
+    loginState = { step: 'name' };
     if (location.hash && location.hash !== '#/') location.hash = '#/';
     else route();
-    syncKid();
+    syncKid(res.kind);
   }
-  function logout() {
+  function clearSession() {
     clearTimeout(syncTimer);
-    if (currentKid()) syncKid();
-    profiles.current = null;
-    saveProfiles();
+    auth = null;
+    saveAuth();
     loadStore();
+    lastFp = progressFp(store);
     currentFach = '';
+    closeUserMenu();
     if (location.hash && location.hash !== '#/') location.hash = '#/';
     else route();
-    syncKids();
   }
-  async function addKid(name) {
-    name = name.trim().replace(/\s+/g, ' ').slice(0, 30);
-    if (!name) return;
-    const existing = profiles.list.find((k) => k.name.toLowerCase() === name.toLowerCase());
-    if (existing) return login(existing.id);
-    let id = 'k' + Date.now().toString(36);
-    let color = COLORS[profiles.list.length % COLORS.length];
-    let synced = false;
+  async function logout() {
+    if (!auth) return;
+    // noch nicht gespeicherten Stand zuerst hochladen
+    try { await syncKid(); } catch (e) { /* egal */ }
+    const token = auth.token;
+    clearSession();
     try {
-      const res = await syncCall('POST', 'add', { id, name, color });
-      id = res.kind.id; name = res.kind.name; color = res.kind.color; synced = true;
-    } catch (e) { /* offline: später hochladen */ }
-    if (profiles.list.some((k) => k.id === id)) return login(id);
-    profiles.list.push({ id, name, color, synced });
-    // Lernstand aus der Zeit vor den Profilen übernimmt das erste Kind
-    if (profiles.list.length === 1) {
-      try {
-        const old = localStorage.getItem(OLD_KEY);
-        if (old) { writeLocal(id, Object.assign(emptyStore(), JSON.parse(old))); localStorage.removeItem(OLD_KEY); }
-      } catch (e) { /* egal */ }
-    }
-    login(id);
+      await fetch(SYNC_API + '?action=logout', { method: 'POST', headers: { 'X-Lernhilfe-Token': token } });
+    } catch (e) { /* egal */ }
   }
-  async function removeKid(id) {
-    const k = profiles.list.find((x) => x.id === id);
-    if (!k || !confirm(`${k.name} entfernen? Der Lernstand von ${k.name} wird auf allen Geräten gelöscht.`)) return;
-    try { await syncCall('POST', 'delete', { id }); } catch (e) {
-      alert('Gerade keine Verbindung zum Server. Bitte später nochmal versuchen.');
-      return;
-    }
-    profiles.list = profiles.list.filter((x) => x.id !== id);
-    try { localStorage.removeItem(keyFor(id)); } catch (e) { /* egal */ }
-    saveProfiles();
-    renderLogin(true);
+  function forceLogout() {
+    const name = auth && auth.kid ? auth.kid.name : '';
+    loginState = { step: 'name', name, msg: 'Bitte melde dich neu an.' };
+    clearSession();
   }
 
+  // ---------- Nutzer-Knopf oben rechts ----------
   function renderUser() {
     const el = document.getElementById('userBox');
     const k = currentKid();
     document.body.classList.toggle('no-user', !k);
     if (!el) return;
-    el.innerHTML = k ? `<button type="button" class="user-btn ${syncState === 'offline' ? 'offline' : ''}" id="userBtn" title="Kind wechseln">${avatar(k, 'sm')}<span class="user-name">${esc(k.name)}</span></button>` : '';
+    el.innerHTML = k ? `<button type="button" class="user-btn ${syncState === 'offline' ? 'offline' : ''}" id="userBtn" aria-haspopup="true" aria-expanded="false" title="${esc(k.name)}">${avatar(k, 'sm')}<span class="user-name">${esc(k.name)}</span></button>
+      <div class="user-menu" id="userMenu" hidden>
+        <div class="user-menu-head">${avatar(k)}<div><b>${esc(k.name)}</b><br><span class="muted small">${k.rolle === 'admin' ? 'Admin' : 'Kind'}${syncState === 'offline' ? ' · offline' : ''}</span></div></div>
+        ${k.rolle === 'admin' ? '<a href="#/admin" class="um-item">⚙️ Benutzer verwalten</a>' : ''}
+        <button type="button" class="um-item" id="umPass">🔑 Passwort ändern</button>
+        <button type="button" class="um-item" id="umLogout">🚪 Abmelden</button>
+      </div>` : '';
     const b = document.getElementById('userBtn');
-    if (b) b.addEventListener('click', logout);
+    if (!b) return;
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const m = document.getElementById('userMenu');
+      m.hidden = !m.hidden;
+      b.setAttribute('aria-expanded', String(!m.hidden));
+    });
+    document.getElementById('umLogout').addEventListener('click', logout);
+    document.getElementById('umPass').addEventListener('click', () => { closeUserMenu(); location.hash = '#/passwort'; });
+    document.getElementById('userMenu').addEventListener('click', (e) => { if (e.target.closest('a')) closeUserMenu(); });
   }
+  function closeUserMenu() {
+    const m = document.getElementById('userMenu');
+    if (m) m.hidden = true;
+  }
+  document.addEventListener('click', (e) => { if (!e.target.closest('#userBox')) closeUserMenu(); });
 
-  function renderLogin(editing) {
+  // ---------- Anmeldeseite ----------
+  let loginState = { step: 'name' };
+  function renderLogin() {
     document.title = 'Anmelden – Lernhilfe';
     document.body.dataset.subject = '';
     const side = document.getElementById('side');
     if (side) side.innerHTML = '';
-    const list = profiles.list;
+    const st = loginState;
+    const known = deviceNames();
+    let form;
+    if (st.step === 'name') {
+      form = `
+        ${known.length ? `<div class="kids">${known.map((k) => `<button type="button" class="kid" data-name="${esc(k.name)}">${avatar(k, 'lg')}<span>${esc(k.name)}</span></button>`).join('')}</div>` : ''}
+        <form class="add-kid" id="loginForm" autocomplete="on">
+          <label for="lgName">Name</label>
+          <div class="add-row">
+            <input type="text" id="lgName" name="username" autocomplete="username" maxlength="30" placeholder="Vorname" autocapitalize="words" value="${esc(st.name || '')}">
+            <button class="btn primary" type="submit">Weiter</button>
+          </div>
+        </form>`;
+    } else {
+      const neu = st.step === 'neu';
+      form = `
+        <div class="kids"><div class="kid static">${avatar({ name: st.name, color: st.color || '#868e96' }, 'lg')}<span>${esc(st.name)}</span></div></div>
+        <form class="add-kid" id="loginForm" autocomplete="on">
+          <input type="text" name="username" autocomplete="username" value="${esc(st.name)}" hidden>
+          ${neu ? `<p class="first-login">👋 Du meldest dich zum ersten Mal an. Denk dir ein Passwort aus (mindestens 4 Zeichen) und merke es dir gut.</p>` : ''}
+          <label for="lgPass">${neu ? 'Neues Passwort' : 'Passwort'}</label>
+          <input type="password" id="lgPass" autocomplete="${neu ? 'new-password' : 'current-password'}" class="full">
+          ${neu ? `<label for="lgPass2">Passwort wiederholen</label><input type="password" id="lgPass2" autocomplete="new-password" class="full">` : ''}
+          ${neu && st.admin ? `<label for="lgCode">Zugangscode <span class="muted small">(steht bei GitHub als Secret LERNHILFE_CODE)</span></label><input type="password" id="lgCode" class="full" autocomplete="off">` : ''}
+          <button class="btn primary full" type="submit">${neu ? 'Passwort speichern und anmelden' : 'Anmelden'}</button>
+          <button class="link small" type="button" id="lgBack">Anderer Name</button>
+        </form>`;
+    }
     app.innerHTML = `
       <section class="login">
         <img src="favicon.svg" alt="" width="64" height="64">
-        <h1>Wer lernt heute?</h1>
-        ${list.length ? `<div class="kids">${list.map((k) => `
-          <div class="kid-wrap">
-            <button type="button" class="kid" data-id="${k.id}" ${editing ? 'disabled' : ''}>${avatar(k, 'lg')}<span>${esc(k.name)}</span></button>
-            ${editing ? `<button type="button" class="kid-x" data-rm="${k.id}" aria-label="${esc(k.name)} entfernen">✕</button>` : ''}
-          </div>`).join('')}</div>` : '<p class="muted">Gib deinen Namen ein, um zu starten.</p>'}
-        <form class="add-kid" id="addKid" autocomplete="off">
-          <label for="kidName">${list.length ? 'Neues Kind' : 'Dein Name'}</label>
-          <div class="add-row">
-            <input type="text" id="kidName" maxlength="30" placeholder="Vorname" autocapitalize="words" ${list.length ? '' : 'autofocus'}>
-            <button class="btn primary" type="submit">${list.length ? 'Hinzufügen' : 'Los geht’s'}</button>
-          </div>
-        </form>
-        ${list.length ? `<button type="button" class="link small" id="editKids">${editing ? 'Fertig' : 'Namen bearbeiten'}</button>` : ''}
-        <p class="muted small">Kein Passwort nötig. Der Lernstand wird gespeichert und ist auf allen Geräten gleich.</p>
+        <h1>${st.step === 'name' ? 'Wer lernt heute?' : `Hallo ${esc(st.name)}!`}</h1>
+        ${form}
+        <div id="lgMsg" aria-live="polite">${st.msg ? `<div class="msg ${st.ok ? 'ok' : 'wrong'}">${esc(st.msg)}</div>` : ''}</div>
       </section>`;
-    app.querySelectorAll('.kid').forEach((b) => b.addEventListener('click', () => login(b.dataset.id)));
-    app.querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', () => removeKid(b.dataset.rm)));
-    const ed = app.querySelector('#editKids');
-    if (ed) ed.addEventListener('click', () => renderLogin(!editing));
-    app.querySelector('#addKid').addEventListener('submit', (e) => {
+    const msg = (t) => { app.querySelector('#lgMsg').innerHTML = t ? `<div class="msg wrong">${esc(t)}</div>` : ''; };
+    const f = app.querySelector('#loginForm');
+    const busyBtn = (on) => { const b = f.querySelector('button[type=submit]'); b.disabled = on; };
+
+    async function checkName(name) {
+      name = name.trim();
+      if (!name) return;
+      busyBtn(true);
+      try {
+        const d = await syncCall('POST', 'status', { name });
+        const k = known.find((x) => x.name.toLowerCase() === d.name.toLowerCase());
+        loginState = { step: d.neu ? 'neu' : 'pass', name: d.name, admin: d.admin, color: k && k.color };
+        renderLogin();
+      } catch (e) {
+        busyBtn(false);
+        msg(e.status ? e.message : 'Keine Verbindung zum Server. Bitte später nochmal versuchen.');
+      }
+    }
+
+    if (st.step === 'name') {
+      app.querySelectorAll('.kid[data-name]').forEach((b) => b.addEventListener('click', () => checkName(b.dataset.name)));
+      f.addEventListener('submit', (e) => { e.preventDefault(); checkName(app.querySelector('#lgName').value); });
+      if (!known.length) app.querySelector('#lgName').focus();
+    } else {
+      app.querySelector('#lgPass').focus();
+      app.querySelector('#lgBack').addEventListener('click', () => { loginState = { step: 'name' }; renderLogin(); });
+      f.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const pass = app.querySelector('#lgPass').value;
+        if (st.step === 'neu') {
+          if (pass.length < 4) return msg('Das Passwort muss mindestens 4 Zeichen haben.');
+          if (pass !== app.querySelector('#lgPass2').value) return msg('Die beiden Passwörter sind nicht gleich.');
+        }
+        busyBtn(true);
+        try {
+          const body = { name: st.name, passwort: pass };
+          const c = app.querySelector('#lgCode');
+          if (c) body.code = c.value;
+          onLoggedIn(await syncCall('POST', 'login', body));
+        } catch (err) {
+          busyBtn(false);
+          msg(err.status ? err.message : 'Keine Verbindung zum Server. Bitte später nochmal versuchen.');
+          if (err.status === 409) { loginState = { step: 'pass', name: st.name, msg: err.message }; renderLogin(); }
+        }
+      });
+    }
+  }
+
+  // ---------- Passwort ändern ----------
+  function renderPasswort() {
+    document.title = 'Passwort ändern – Lernhilfe';
+    app.innerHTML = `
+      <nav class="crumbs"><a href="#/">← Übersicht</a></nav>
+      <section class="card narrow">
+        <h1>🔑 Passwort ändern</h1>
+        <form id="pwForm" class="stack">
+          <input type="text" name="username" autocomplete="username" value="${esc(currentKid().name)}" hidden>
+          <label for="pwAlt">Altes Passwort</label><input type="password" id="pwAlt" autocomplete="current-password" class="full">
+          <label for="pwNeu">Neues Passwort</label><input type="password" id="pwNeu" autocomplete="new-password" class="full">
+          <label for="pwNeu2">Neues Passwort wiederholen</label><input type="password" id="pwNeu2" autocomplete="new-password" class="full">
+          <button class="btn primary" type="submit">Speichern</button>
+        </form>
+        <div id="pwMsg" aria-live="polite"></div>
+      </section>`;
+    const f = app.querySelector('#pwForm');
+    const out = (cls, t) => { app.querySelector('#pwMsg').innerHTML = `<div class="msg ${cls}">${esc(t)}</div>`; };
+    f.addEventListener('submit', async (e) => {
       e.preventDefault();
-      addKid(app.querySelector('#kidName').value);
+      const neu = app.querySelector('#pwNeu').value;
+      if (neu.length < 4) return out('wrong', 'Das Passwort muss mindestens 4 Zeichen haben.');
+      if (neu !== app.querySelector('#pwNeu2').value) return out('wrong', 'Die beiden neuen Passwörter sind nicht gleich.');
+      try {
+        await syncCall('POST', 'passwort', { alt: app.querySelector('#pwAlt').value, neu });
+        f.reset();
+        out('ok', '✔ Passwort geändert.');
+      } catch (err) {
+        out('wrong', err.status ? err.message : 'Keine Verbindung zum Server.');
+      }
     });
-    if (!list.length) app.querySelector('#kidName').focus();
+  }
+
+  // ---------- Benutzerverwaltung (nur Admin) ----------
+  async function renderAdmin() {
+    document.title = 'Benutzer verwalten – Lernhilfe';
+    document.body.dataset.subject = '';
+    if (!isAdmin()) { app.innerHTML = '<div class="card"><h2>Nur für Admins</h2><a class="btn" href="#/">Zur Übersicht</a></div>'; return; }
+    app.innerHTML = '<p class="muted">Lade Benutzer …</p>';
+    let users;
+    try { users = (await syncCall('GET', 'users')).users; } catch (e) {
+      app.innerHTML = `<div class="card"><h2>Benutzer konnten nicht geladen werden</h2><p>${esc(e.message)}</p></div>`;
+      return;
+    }
+    if (location.hash !== '#/admin') return;
+    const me = currentKid();
+    const when = (t) => (t ? new Date(String(t).replace(' ', 'T')).toLocaleDateString('de-DE') : 'noch nie');
+    app.innerHTML = `
+      <header class="subject-head"><span class="subject-icon" aria-hidden="true">⚙️</span>
+        <div><h1>Benutzer verwalten</h1><p>Kinder und Admins anlegen, umbenennen, Passwörter zurücksetzen</p></div></header>
+      <section class="card">
+        <h2>Neuer Benutzer</h2>
+        <form id="addUser" class="add-row wrap">
+          <input type="text" id="auName" maxlength="30" placeholder="Vorname" aria-label="Name" required>
+          <select id="auRolle" aria-label="Rolle"><option value="kind">Kind</option><option value="admin">Admin</option></select>
+          <button class="btn primary" type="submit">Anlegen</button>
+        </form>
+        <p class="muted small">Ein neuer Benutzer legt sein Passwort beim ersten Anmelden selbst fest.</p>
+        <div id="auMsg" aria-live="polite"></div>
+      </section>
+      <div class="user-list">${users.map((u) => `
+        <section class="card user-card" data-id="${esc(u.id)}">
+          <div class="uc-head">${avatar(u)}
+            <div class="uc-name"><span><b>${esc(u.name)}</b>${u.id === me.id ? ' <span class="tag">du</span>' : ''}</span>
+              <span class="muted small">${u.rolle === 'admin' ? 'Admin' : 'Kind'} · ${u.hat_passwort ? 'Passwort gesetzt' : '<b>wartet auf erstes Anmelden</b>'} · zuletzt aktiv: ${when(u.zuletzt)}</span>
+              <span class="muted small">Lernstand: ${u.stand.vokabeln} Vokabeln sicher · ${u.stand.uebungen} Übungen geschafft</span>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn" data-act="rename">Umbenennen</button>
+            ${u.hat_passwort ? '<button class="btn" data-act="resetpw">Passwort zurücksetzen</button>' : ''}
+            <button class="btn" data-act="rolle">${u.rolle === 'admin' ? 'Zum Kind machen' : 'Zum Admin machen'}</button>
+            <button class="btn" data-act="resetstand">Lernstand löschen</button>
+            ${u.id !== me.id ? '<button class="btn bad" data-act="delete">Löschen</button>' : ''}
+          </div>
+        </section>`).join('')}</div>`;
+
+    const run = async (fn) => {
+      try { await fn(); renderAdmin(); } catch (e) { alert(e.message); }
+    };
+    app.querySelector('#addUser').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = app.querySelector('#auName').value.trim();
+      if (!name) return;
+      run(() => syncCall('POST', 'user_add', { name, rolle: app.querySelector('#auRolle').value }));
+    });
+    app.querySelectorAll('.user-card').forEach((card) => {
+      const u = users.find((x) => x.id === card.dataset.id);
+      card.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-act]');
+        if (!b) return;
+        const act = b.dataset.act;
+        if (act === 'rename') {
+          const n = prompt('Neuer Name:', u.name);
+          if (n && n.trim() && n.trim() !== u.name) run(() => syncCall('POST', 'user_update', { id: u.id, name: n.trim() }));
+        } else if (act === 'resetpw') {
+          if (confirm(`Passwort von ${u.name} zurücksetzen? ${u.name} legt beim nächsten Anmelden ein neues fest und wird auf allen Geräten abgemeldet.`)) {
+            run(() => syncCall('POST', 'user_update', { id: u.id, reset_passwort: true }));
+          }
+        } else if (act === 'rolle') {
+          run(() => syncCall('POST', 'user_update', { id: u.id, rolle: u.rolle === 'admin' ? 'kind' : 'admin' }));
+        } else if (act === 'resetstand') {
+          if (confirm(`Den gesamten Lernstand von ${u.name} löschen?`)) run(() => syncCall('POST', 'user_update', { id: u.id, reset_stand: true }));
+        } else if (act === 'delete') {
+          if (confirm(`${u.name} mit dem gesamten Lernstand endgültig löschen?`)) run(() => syncCall('POST', 'user_delete', { id: u.id }));
+        }
+      });
+    });
   }
 
   // ---------- Startseite: Übersicht ----------
@@ -1016,7 +1158,7 @@
       for (const p of photos) images.push(await shrink(p.file));
       const r = await fetch(API + '?action=analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Lernhilfe-Code': store.prefs.code || '' },
+        headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
         body: JSON.stringify({ images }),
       });
       const d = await r.json().catch(() => ({ error: `Der Server hat nicht richtig geantwortet (${r.status}).` }));
@@ -1043,7 +1185,7 @@
     if (!confirm(`Thema „${subj.name}“ wirklich löschen?`)) return;
     const send = () => fetch(API + '?action=delete', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Lernhilfe-Code': store.prefs.code || '' },
+      headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
       body: JSON.stringify({ id: subj.remote.id }),
     });
     try {
@@ -1587,7 +1729,7 @@
   ORDER.forEach((id) => { L[id].route = '#/' + id; L[id].fach = id; });
   loadRemote();
   route();
-  syncKids().then(() => { if (currentKid()) syncKid(); });
+  if (currentKid()) syncKid();
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && currentKid()) syncKid(); });
-  window.addEventListener('online', () => { syncKids(); if (currentKid()) syncKid(); });
+  window.addEventListener('online', () => { if (currentKid()) syncKid(); });
 })();

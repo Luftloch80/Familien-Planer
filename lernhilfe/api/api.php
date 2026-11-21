@@ -21,6 +21,7 @@ if (!is_file(__DIR__ . '/vendor/autoload.php')) {
     exit;
 }
 require __DIR__ . '/vendor/autoload.php';
+require __DIR__ . '/common.php';
 
 use Anthropic\Client;
 use Anthropic\Core\Exceptions\APIStatusException;
@@ -29,7 +30,6 @@ use Anthropic\Lib\Streaming\MessageAccumulator;
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
-const JSON_FLAGS = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
 const MAX_BODY_BYTES = 25 * 1024 * 1024;
 const MAX_IMAGES = 8;
 const MODEL = 'claude-opus-5-5';
@@ -91,56 +91,6 @@ function basisThemen(): array
     return $list;
 }
 
-function fail(int $status, string $message): never
-{
-    http_response_code($status);
-    echo json_encode(['error' => $message], JSON_FLAGS);
-    exit;
-}
-
-function config(): array
-{
-    static $config = null;
-    if ($config === null) {
-        $file = __DIR__ . '/config.php';
-        if (!is_file($file)) fail(500, 'config.php fehlt auf dem Server');
-        $config = require $file;
-    }
-    return $config;
-}
-
-function db(): PDO
-{
-    static $pdo = null;
-    if ($pdo) return $pdo;
-    $c = config()['db'];
-    $dsn = "mysql:host={$c['host']};dbname={$c['name']};charset=utf8mb4";
-    if (!empty($c['port'])) $dsn .= ";port={$c['port']}";
-    $pdo = new PDO($dsn, $c['user'], $c['password'], [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    ]);
-    $pdo->exec(
-        'CREATE TABLE IF NOT EXISTS lernhilfe_themen (
-            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            fach VARCHAR(32) NOT NULL,
-            basis VARCHAR(32) NULL,
-            titel VARCHAR(255) NOT NULL,
-            data LONGTEXT NOT NULL,
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
-    );
-    return $pdo;
-}
-
-function requireCode(): void
-{
-    $code = (string)(config()['code'] ?? '');
-    if ($code === '') return;
-    $given = (string)($_SERVER['HTTP_X_LERNHILFE_CODE'] ?? '');
-    if (!hash_equals($code, $given)) fail(401, 'Zugangscode fehlt oder ist falsch');
-}
 
 function readJsonBody(): array
 {
@@ -229,7 +179,7 @@ TXT;
 
 function analyze(): void
 {
-    requireCode();
+    requireUserOrCode();
     $body = readJsonBody();
     $images = $body['images'] ?? null;
     if (!is_array($images) || !$images) fail(400, 'Keine Fotos');
@@ -431,7 +381,7 @@ function saveResult(array $r, array $themen, int $fotos): array
 // Epoche (oder Titel) eines Themas von Hand ändern
 function updateThema(): void
 {
-    requireCode();
+    requireUserOrCode();
     $body = readJsonBody();
     $id = (int)($body['id'] ?? 0);
     if ($id <= 0) fail(400, 'id fehlt');
@@ -449,7 +399,7 @@ function updateThema(): void
 
 function deleteThema(): void
 {
-    requireCode();
+    requireAdmin();
     $body = readJsonBody();
     $id = (int)($body['id'] ?? 0);
     if ($id <= 0) fail(400, 'id fehlt');
