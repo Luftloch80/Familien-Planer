@@ -470,7 +470,7 @@
     const here = activeRoute || location.hash || '#/';
     side.innerHTML = `
       <div class="drawer-head">
-        <a class="drawer-brand" href="#/"><img src="favicon.svg" alt="" width="34" height="34"> Lernhilfe</a>
+        <a class="logo drawer-logo" href="#/">LERNFLIX</a>
         <button type="button" class="drawer-close" id="drawerClose" aria-label="Menü schließen">✕</button>
       </div>
       <nav class="nav-list" aria-label="Hauptmenü">
@@ -688,7 +688,7 @@
 
   // ---------- Fach-Übersicht ----------
   function renderFach(fach) {
-    document.title = `${fachName(fach)} – Lernhilfe`;
+    document.title = `${fachName(fach)} – Lernflix`;
     document.body.dataset.subject = ORDER.includes(fach) ? fach : '';
     const topics = topicsOf(fach);
     app.innerHTML = `
@@ -772,6 +772,18 @@
     const k = currentKid();
     document.body.classList.toggle('no-user', !k);
     if (!el) return;
+    if (!k) {
+      el.innerHTML = `<button type="button" class="gear-btn" id="adminBtn" aria-label="Verwaltung (Admin)" title="Verwaltung">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>`;
+      document.getElementById('adminBtn').addEventListener('click', () => {
+        const admins = (profileNames || []).filter((x) => x.admin);
+        if (admins.length === 1) return choose(admins[0].name);
+        loginState = { step: 'admin', loaded: true };
+        renderLogin();
+      });
+      return;
+    }
     el.innerHTML = k ? `<button type="button" class="user-btn ${syncState === 'offline' ? 'offline' : ''}" id="userBtn" aria-haspopup="true" aria-expanded="false" title="${esc(k.name)}">${avatar(k, 'sm')}<span class="user-name">${esc(k.name)}</span></button>
       <div class="user-menu" id="userMenu" hidden>
         <div class="user-menu-head">${avatar(k)}<div><b>${esc(k.name)}</b><br><span class="muted small">${k.rolle === 'admin' ? 'Admin' : 'Kind'}${syncState === 'offline' ? ' · offline' : ''}</span></div></div>
@@ -813,24 +825,28 @@
   }
 
   function renderLogin() {
-    document.title = 'Anmelden – Lernhilfe';
+    document.title = 'Lernflix';
     document.body.dataset.subject = '';
     const side = document.getElementById('side');
     if (side) side.innerHTML = '';
     const st = loginState;
     const tile = (k, attrs = '') => `<button type="button" class="profile" ${attrs}>
-        <span class="profile-pic" style="background:${esc(k.color || '#868e96')}">${esc(initials(k.name))}${k.admin ? '<span class="profile-badge" aria-hidden="true">⚙️</span>' : ''}</span>
+        <span class="profile-pic" style="background:${esc(k.color || '#868e96')}">${esc(initials(k.name))}</span>
         <span class="profile-name">${esc(k.name)}</span></button>`;
 
-    if (st.step === 'name') {
-      const names = profileNames || [];
+    if (st.step === 'name' || st.step === 'admin') {
+      const adminStep = st.step === 'admin';
+      const names = (profileNames || []).filter((k) => !!k.admin === adminStep);
       app.innerHTML = `
         <section class="profiles-page">
-          <h1>Wer lernt gerade?</h1>
+          <h1>${adminStep ? 'Verwaltung' : 'Wer lernt gerade?'}</h1>
           ${names.length ? `<div class="profiles">${names.map((k) => tile(k, `data-name="${esc(k.name)}"`)).join('')}</div>`
             : `<p class="profiles-empty">${profileNames ? 'Noch keine Profile angelegt.' : 'Profile werden geladen …'}</p>`}
+          ${adminStep ? '<button class="link back-link" type="button" id="lgBack">← Zurück zu den Profilen</button>' : ''}
           <div id="lgMsg" aria-live="polite">${st.msg ? `<div class="msg wrong">${esc(st.msg)}</div>` : ''}</div>
         </section>`;
+      const bk = app.querySelector('#lgBack');
+      if (bk) bk.addEventListener('click', () => { loginState = { step: 'name', loaded: true }; renderLogin(); });
       app.querySelectorAll('.profile[data-name]').forEach((b) => b.addEventListener('click', () => choose(b.dataset.name)));
       if (!st.loaded) {
         st.loaded = true;
@@ -899,7 +915,7 @@
 
   // ---------- Passwort ändern ----------
   function renderPasswort() {
-    document.title = 'Passwort ändern – Lernhilfe';
+    document.title = 'Passwort ändern – Lernflix';
     app.innerHTML = `
       <nav class="crumbs"><a href="#/">← Übersicht</a></nav>
       <section class="card narrow">
@@ -932,7 +948,7 @@
 
   // ---------- Benutzerverwaltung (nur Admin) ----------
   async function renderAdmin() {
-    document.title = 'Benutzer verwalten – Lernhilfe';
+    document.title = 'Benutzer verwalten – Lernflix';
     document.body.dataset.subject = '';
     if (!isAdmin()) { app.innerHTML = '<div class="card"><h2>Nur für Admins</h2><a class="btn" href="#/">Zur Übersicht</a></div>'; return; }
     app.innerHTML = '<p class="muted">Lade Benutzer …</p>';
@@ -1008,34 +1024,49 @@
   }
 
   // ---------- Startseite: Übersicht ----------
+  const FACH_FARBE = { mathe: '#2f80ed', englisch: '#e0457b', franz: '#7b5cf0', bio: '#2b8a3e', deutsch: '#e8590c', latein: '#a1887f', spanisch: '#f59f00', physik: '#0c8599', chemie: '#9c36b5', geschichte: '#a0522d', erdkunde: '#1098ad', musik: '#d6336c', religion: '#5c7cfa', sonstiges: '#868e96' };
+  const fachFarbe = (f) => FACH_FARBE[f] || FACH_FARBE.sonstiges;
+
+  function tileHtml(x, isNew) {
+    const p = progressOf(x.subj);
+    const ep = epocheOf(x);
+    return `<a class="tile" href="${x.subj.route}" style="--c:${fachFarbe(x.subj.fach)}">
+      ${isNew ? '<span class="tile-badge">NEU</span>' : ''}
+      <span class="tile-icon" aria-hidden="true">${fachIcon(x.subj.fach)}</span>
+      <span class="tile-kicker">${esc(fachName(x.subj.fach))}${ep ? ' · ' + esc(ep) : ''}</span>
+      <span class="tile-title">${esc(x.title)}</span>
+      <span class="tile-bar" title="${esc(p.text || 'Noch nicht geübt')}"><span style="width:${Math.round(p.pct * 100)}%"></span></span>
+    </a>`;
+  }
+
   function renderStart() {
-    document.title = 'Lernhilfe';
+    document.title = 'Lernflix';
     document.body.dataset.subject = '';
-    const neu = alleThemen().filter((t) => t.updated_at)
-      .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at))).slice(0, 4)
+    const recent = alleThemen().filter((t) => t.updated_at)
+      .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at))).slice(0, 8)
       .map((t) => ({ subj: topicSubj(t), title: t.titel, t }));
+    const angefangen = faecherList().flatMap((f) => topicsOf(f)).filter((x) => { const p = progressOf(x.subj).pct; return p > 0 && p < 1; });
+    const row = (title, href, items, isNew) => items.length ? `<section class="row">
+        <h2>${href ? `<a href="${href}">${esc(title)}<span class="more">Alle ansehen ›</span></a>` : esc(title)}</h2>
+        <div class="row-scroll">${items.map((x) => tileHtml(x, isNew)).join('')}</div>
+      </section>` : '';
     app.innerHTML = `
-      <section class="hero small-hero">
+      <section class="billboard">
         <h1>Hallo ${esc(currentKid().name)}!</h1>
-        <p>Wähle ein Fach. Pro Epoche kannst du ein Lernheft als PDF drucken.</p>
-        ${FOTOS_AKTIV ? '<p><a class="btn primary big-btn" href="#/fotos">📷 Neue Fotos auswerten</a></p>' : ''}
+        <p>Such dir ein Thema aus und leg los. Pro Epoche kannst du dir ein Lernheft als PDF drucken.</p>
+        <div class="actions">
+          ${angefangen.length ? `<a class="btn primary" href="${angefangen[0].subj.route}">▶ Weiterlernen</a>` : ''}
+          ${FOTOS_AKTIV ? `<a class="btn" href="#/fotos">📷 Neue Fotos</a>` : ''}
+        </div>
       </section>
-      <div class="subjects">${faecherList().map((f) => {
-        const eps = epochenOf(f);
-        const n = eps.reduce((k, g) => k + g.topics.length, 0);
-        return `<a class="subject-card" data-s="${f}" href="#/f/${f}">
-          <span class="subject-icon" aria-hidden="true">${fachIcon(f)}</span>
-          <span class="subject-name">${esc(fachName(f))}</span>
-          <span class="subject-sub">${eps.map((g) => esc(g.name || 'Fachunterricht')).join(' · ')}</span>
-          <span class="subject-meta"><span>${n} ${n === 1 ? 'Thema' : 'Themen'}</span></span>
-        </a>`;
-      }).join('')}</div>
-      ${neu.length ? `<section><h2 style="margin-top:24px">Zuletzt hinzugefügt</h2><div class="topic-list">${neu.map(topicCard).join('')}</div></section>` : ''}`;
+      ${row('Weiterlernen', '', angefangen)}
+      ${row('Neu hinzugefügt', '', recent, true)}
+      ${faecherList().map((f) => row(`${fachIcon(f)} ${fachName(f)}`, `#/f/${f}`, topicsOf(f))).join('')}`;
   }
 
   // ---------- Startseite: Fotos ----------
   function renderFotos() {
-    document.title = 'Lernhilfe';
+    document.title = 'Lernflix';
     document.body.dataset.subject = '';
     const recent = remote.slice(0, 5).map((t) => ({ subj: topicSubj(t), title: t.titel, t }));
     const r = lastResult;
@@ -1064,7 +1095,7 @@
     app.innerHTML = `
       <section class="hero small-hero">
         <h1>Neue Fotos</h1>
-        <p>Fotografiere Arbeitsblätter, Buchseiten oder Hefteinträge. Die Lernhilfe erkennt automatisch das Fach und ob es ein neues Thema ist – und macht daraus Vokabeln, Erklärungen und Übungen.</p>
+        <p>Fotografiere Arbeitsblätter, Buchseiten oder Hefteinträge. Lernflix erkennt automatisch das Fach und ob es ein neues Thema ist – und macht daraus Vokabeln, Erklärungen und Übungen.</p>
       </section>
       <section class="card photo-card">
         ${apiOk === false ? '<div class="msg almost">Die Fotoerkennung ist gerade nicht erreichbar. Sie funktioniert nur, wenn die Seite auf dem Server läuft.</div>' : ''}
@@ -1185,7 +1216,7 @@
 
   // ---------- Themenseite ----------
   function renderSubject(subj, tab, tabs) {
-    document.title = `${subj.name} – Lernhilfe`;
+    document.title = `${subj.name} – Lernflix`;
     document.body.dataset.subject = ORDER.includes(subj.fach) ? subj.fach : '';
     const t = subj.remote;
     const verlauf = t && t.data && t.data.verlauf ? t.data.verlauf : [];
