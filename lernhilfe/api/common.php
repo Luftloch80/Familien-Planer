@@ -50,6 +50,7 @@ function db(): PDO
     $cols = array_column($pdo->query('SHOW COLUMNS FROM lernhilfe_kinder')->fetchAll(), 'Field');
     if (!in_array('pass_hash', $cols, true)) $pdo->exec('ALTER TABLE lernhilfe_kinder ADD pass_hash VARCHAR(255) NULL');
     if (!in_array('rolle', $cols, true)) $pdo->exec("ALTER TABLE lernhilfe_kinder ADD rolle VARCHAR(10) NOT NULL DEFAULT 'kind'");
+    if (!in_array('bild', $cols, true)) $pdo->exec('ALTER TABLE lernhilfe_kinder ADD bild MEDIUMTEXT NULL');
     $pdo->exec(
         'CREATE TABLE IF NOT EXISTS lernhilfe_sessions (
             token_hash CHAR(64) NOT NULL PRIMARY KEY,

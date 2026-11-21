@@ -573,3 +573,17 @@ select, input[type=text], input[type=password], textarea { background: #2a2a2a; 
 /* Druckansicht bleibt hell */
 .print-doc { color-scheme: light; }
 @media print { body { background: #fff; color: #111; } }
+
+/* Profilbilder */
+.avatar, .profile-pic { overflow: hidden; }
+.avatar img, .profile-pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pic-emoji { font-size: 1.15em; line-height: 1; }
+.avatar .pic-emoji { font-size: 1.25em; }
+.profile-pic .pic-emoji { font-size: 1.25em; }
+.pic-page { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+.pic-page h2 { margin: 10px 0 0; font-size: 1.1rem; color: var(--muted); }
+.pic-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 10px; width: 100%; max-width: 640px; }
+.pic-opt { aspect-ratio: 1; border-radius: 6px; border: 3px solid transparent; font-size: 2rem; font-weight: 700; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.pic-opt:hover { border-color: rgba(255,255,255,.5); }
+.pic-opt.sel { border-color: #fff; }
+.pic-page .actions { justify-content: center; }

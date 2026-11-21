@@ -10,12 +10,13 @@
 // Mit Token (Header X-Lernhilfe-Token):
 //   POST ?action=logout
 //   POST ?action=passwort {alt,neu}                     -> eigenes Passwort ändern
+//   POST ?action=bild     {bild}                        -> eigenes Profilbild (emoji:… / data-URL / null)
 //   GET  ?action=get                                    -> {"kind":{...,data}}
 //   POST ?action=save   {base,data}                     -> {"ok":true,"ts":n} oder 409 mit aktuellem Stand
 // Nur Admin:
 //   GET  ?action=users                                  -> {"users":[...]}
 //   POST ?action=user_add    {name,rolle}
-//   POST ?action=user_update {id,name?,rolle?,reset_passwort?}
+//   POST ?action=user_update {id,name?,rolle?,bild?,reset_passwort?,reset_stand?}
 //   POST ?action=user_delete {id}
 
 declare(strict_types=1);
@@ -30,7 +31,7 @@ const MIN_PASSWORT = 4;
 
 function kindOut(array $r, bool $withData): array
 {
-    $k = ['id' => $r['id'], 'name' => $r['name'], 'color' => $r['color'], 'rolle' => $r['rolle'], 'ts' => (int)$r['ts']];
+    $k = ['id' => $r['id'], 'name' => $r['name'], 'color' => $r['color'], 'rolle' => $r['rolle'], 'bild' => $r['bild'] ?? null, 'ts' => (int)$r['ts']];
     if ($withData) {
         $d = json_decode($r['data'], true);
         $k['data'] = is_array($d) && $d ? $d : new stdClass();
@@ -66,6 +67,22 @@ function checkPasswort(string $p): void
     if (mb_strlen($p) > 200) fail(400, 'Das Passwort ist zu lang.');
 }
 
+// Profilbild: "emoji:🦊", ein kleines Foto als data-URL, oder null (Anfangsbuchstabe)
+function cleanBild(mixed $b): ?string
+{
+    if ($b === null || $b === '') return null;
+    $b = (string)$b;
+    if (str_starts_with($b, 'emoji:')) {
+        if (mb_strlen($b) > 20) fail(400, 'Ungültiges Bild');
+        return $b;
+    }
+    if (preg_match('#^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$#', $b)) {
+        if (strlen($b) > 400000) fail(413, 'Das Bild ist zu groß.');
+        return $b;
+    }
+    fail(400, 'Ungültiges Bild');
+}
+
 function adminCount(): int
 {
     return (int)db()->query("SELECT COUNT(*) FROM lernhilfe_kinder WHERE rolle = 'admin'")->fetchColumn();
@@ -89,8 +106,8 @@ try {
     switch ("$method $action") {
         case 'GET namen': {
             // nur Namen und Farben für die Profil-Auswahl auf der Startseite
-            $rows = db()->query("SELECT id, name, color, rolle FROM lernhilfe_kinder ORDER BY rolle = 'admin', name")->fetchAll();
-            echo json_encode(['namen' => array_map(fn ($r) => ['name' => $r['name'], 'color' => $r['color'], 'admin' => $r['rolle'] === 'admin'], $rows)], JSON_FLAGS);
+            $rows = db()->query("SELECT id, name, color, rolle, bild FROM lernhilfe_kinder ORDER BY rolle = 'admin', name")->fetchAll();
+            echo json_encode(['namen' => array_map(fn ($r) => ['name' => $r['name'], 'color' => $r['color'], 'bild' => $r['bild'], 'admin' => $r['rolle'] === 'admin'], $rows)], JSON_FLAGS);
             break;
         }
         case 'POST status': {
@@ -136,6 +153,13 @@ try {
             $neu = (string)($b['neu'] ?? '');
             checkPasswort($neu);
             db()->prepare('UPDATE lernhilfe_kinder SET pass_hash = ? WHERE id = ?')->execute([password_hash($neu, PASSWORD_DEFAULT), $u['id']]);
+            echo json_encode(['ok' => true], JSON_FLAGS);
+            break;
+        }
+        case 'POST bild': {
+            $u = requireUser();
+            $b = readBody();
+            db()->prepare('UPDATE lernhilfe_kinder SET bild = ? WHERE id = ?')->execute([cleanBild($b['bild'] ?? null), $u['id']]);
             echo json_encode(['ok' => true], JSON_FLAGS);
             break;
         }
@@ -198,6 +222,9 @@ try {
                 $rolle = $b['rolle'] === 'admin' ? 'admin' : 'kind';
                 if ($rolle === 'kind' && $r['rolle'] === 'admin' && adminCount() <= 1) fail(409, 'Es muss mindestens einen Admin geben.');
                 db()->prepare('UPDATE lernhilfe_kinder SET rolle = ? WHERE id = ?')->execute([$rolle, $r['id']]);
+            }
+            if (array_key_exists('bild', $b)) {
+                db()->prepare('UPDATE lernhilfe_kinder SET bild = ? WHERE id = ?')->execute([cleanBild($b['bild']), $r['id']]);
             }
             if (!empty($b['reset_passwort'])) {
                 // Passwort zurücksetzen: beim nächsten Anmelden wird ein neues festgelegt

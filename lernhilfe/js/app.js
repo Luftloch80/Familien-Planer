@@ -128,8 +128,8 @@
           server = res.kind;
         }
         // Name/Farbe/Rolle könnten sich geändert haben
-        if (server && auth && auth.kid && (auth.kid.name !== server.name || auth.kid.rolle !== server.rolle || auth.kid.color !== server.color)) {
-          Object.assign(auth.kid, { name: server.name, rolle: server.rolle, color: server.color });
+        if (server && auth && auth.kid && (auth.kid.name !== server.name || auth.kid.rolle !== server.rolle || auth.kid.color !== server.color || (auth.kid.bild || null) !== (server.bild || null))) {
+          Object.assign(auth.kid, { name: server.name, rolle: server.rolle, color: server.color, bild: server.bild || null });
           saveAuth();
           renderUser();
           renderSide();
@@ -534,6 +534,7 @@
       tabPart = parts[1];
     }
     if (parts[0] === 'admin') { renderSide('#/admin'); return renderAdmin(); }
+    if (parts[0] === 'profilbild') { renderSide(''); return renderProfilbild(parts[1] || ''); }
     if (parts[0] === 'passwort') { renderSide(''); return renderPasswort(); }
     if (parts[0] === 'fotos' && FOTOS_AKTIV) { renderSide('#/fotos'); return renderFotos(); }
     if (!subj) { renderSide('#/'); return renderStart(); }
@@ -724,10 +725,17 @@
 
   // ---------- Anmeldung ----------
   const initials = (n) => n.trim().split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-  const avatar = (k, cls = '') => `<span class="avatar ${cls}" style="background:${esc(k.color || '#868e96')}" aria-hidden="true">${esc(initials(k.name))}</span>`;
+  // Inhalt eines Profilbilds: eigenes Foto, Tier/Symbol oder Anfangsbuchstabe
+  function picFace(k) {
+    const b = k && k.bild;
+    if (b && b.startsWith('data:image/')) return `<img src="${esc(b)}" alt="">`;
+    if (b && b.startsWith('emoji:')) return `<span class="pic-emoji">${esc(b.slice(6))}</span>`;
+    return esc(initials(k.name || '?'));
+  }
+  const avatar = (k, cls = '') => `<span class="avatar ${cls}" style="background:${esc(k.color || '#868e96')}" aria-hidden="true">${picFace(k)}</span>`;
 
   function onLoggedIn(res) {
-    auth = { token: res.token, kid: { id: res.kind.id, name: res.kind.name, color: res.kind.color, rolle: res.kind.rolle } };
+    auth = { token: res.token, kid: { id: res.kind.id, name: res.kind.name, color: res.kind.color, rolle: res.kind.rolle, bild: res.kind.bild || null } };
     saveAuth();
     loadStore();
     store = mergeStores(store, res.kind.data);
@@ -788,6 +796,7 @@
       <div class="user-menu" id="userMenu" hidden>
         <div class="user-menu-head">${avatar(k)}<div><b>${esc(k.name)}</b><br><span class="muted small">${k.rolle === 'admin' ? 'Admin' : 'Kind'}${syncState === 'offline' ? ' · offline' : ''}</span></div></div>
         ${k.rolle === 'admin' ? '<a href="#/admin" class="um-item">⚙️ Benutzer verwalten</a>' : ''}
+        <a href="#/profilbild" class="um-item">🖼️ Profilbild ändern</a>
         <button type="button" class="um-item" id="umPass">🔑 Passwort ändern</button>
         <button type="button" class="um-item" id="umLogout">🚪 Abmelden</button>
       </div>` : '';
@@ -831,7 +840,7 @@
     if (side) side.innerHTML = '';
     const st = loginState;
     const tile = (k, attrs = '') => `<button type="button" class="profile" ${attrs}>
-        <span class="profile-pic" style="background:${esc(k.color || '#868e96')}">${esc(initials(k.name))}</span>
+        <span class="profile-pic" style="background:${esc(k.color || '#868e96')}">${picFace(k)}</span>
         <span class="profile-name">${esc(k.name)}</span></button>`;
 
     if (st.step === 'name' || st.step === 'admin') {
@@ -862,7 +871,7 @@
     const neu = st.step === 'neu';
     app.innerHTML = `
       <section class="profiles-page">
-        <div class="profiles single">${tile({ name: st.name, color: st.color, admin: st.admin }, 'disabled')}</div>
+        <div class="profiles single">${tile({ name: st.name, color: st.color, admin: st.admin, bild: st.bild }, 'disabled')}</div>
         <form class="pass-form" id="loginForm" autocomplete="on">
           <input type="text" name="username" autocomplete="username" value="${esc(st.name)}" hidden>
           ${neu ? `<p class="first-login">👋 Du meldest dich zum ersten Mal an. Denk dir ein Passwort aus (mindestens 4 Zeichen) und merke es dir gut.</p>` : ''}
@@ -905,7 +914,7 @@
     const k = (profileNames || []).find((x) => x.name === name) || { name };
     try {
       const d = await syncCall('POST', 'status', { name });
-      loginState = { step: d.neu ? 'neu' : 'pass', name: d.name, admin: d.admin, color: k.color };
+      loginState = { step: d.neu ? 'neu' : 'pass', name: d.name, admin: d.admin, color: k.color, bild: k.bild };
     } catch (e) {
       loginState = { step: 'name', loaded: true, msg: e.status ? e.message : 'Keine Verbindung zum Server. Bitte später nochmal versuchen.' };
       if (e.status === 404) loadNames().then(() => renderLogin());
@@ -946,6 +955,72 @@
     });
   }
 
+  // ---------- Profilbild ----------
+  const BILDER = ['🦊', '🐼', '🐨', '🐯', '🦁', '🐸', '🐵', '🐰', '🐻', '🐱', '🐶', '🦄', '🐧', '🐙', '🦖', '🐢', '🐬', '🦉', '🐝', '🦋', '🐴', '🦔', '🌸', '🌈', '⚽', '🎸', '🎨', '🚀', '⭐', '🍓'];
+  let adminUsers = [];
+  async function shrinkSquare(file, size) {
+    let src;
+    try { src = await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch (e) {
+      src = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('Das Bild konnte nicht gelesen werden.')); i.src = URL.createObjectURL(file); });
+    }
+    const side = Math.min(src.width, src.height);
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    c.getContext('2d').drawImage(src, (src.width - side) / 2, (src.height - side) / 2, side, side, 0, 0, size, size);
+    return c.toDataURL('image/jpeg', 0.85);
+  }
+
+  function renderProfilbild(targetId) {
+    const me = currentKid();
+    const forOther = targetId && targetId !== me.id;
+    if (forOther && !isAdmin()) { location.hash = '#/profilbild'; return; }
+    const target = forOther ? adminUsers.find((u) => u.id === targetId) : me;
+    if (!target) { location.hash = '#/admin'; return; }
+    document.title = 'Profilbild – Lernflix';
+    document.body.dataset.subject = '';
+    let wahl = target.bild || null;
+    const draw = () => {
+      app.innerHTML = `
+        <nav class="crumbs"><a href="${forOther ? '#/admin' : '#/'}">← ${forOther ? 'Benutzer verwalten' : 'Übersicht'}</a></nav>
+        <section class="pic-page">
+          <h1>Profilbild${forOther ? ' von ' + esc(target.name) : ''}</h1>
+          <div class="profiles single"><div class="profile"><span class="profile-pic" style="background:${esc(target.color)}">${picFace({ name: target.name, bild: wahl })}</span><span class="profile-name">${esc(target.name)}</span></div></div>
+          <h2>Bild aussuchen</h2>
+          <div class="pic-grid">
+            <button type="button" class="pic-opt ${!wahl ? 'sel' : ''}" data-bild="" style="background:${esc(target.color)}" title="Anfangsbuchstabe">${esc(initials(target.name))}</button>
+            ${BILDER.map((e) => `<button type="button" class="pic-opt ${wahl === 'emoji:' + e ? 'sel' : ''}" data-bild="emoji:${e}" style="background:${esc(target.color)}">${e}</button>`).join('')}
+          </div>
+          <div class="actions">
+            <label class="btn">📷 Eigenes Foto wählen<input class="vh" type="file" accept="image/*" id="picFile"></label>
+            <button class="btn primary" id="picSave">Speichern</button>
+          </div>
+          <div id="picMsg" aria-live="polite"></div>
+        </section>`;
+      app.querySelectorAll('.pic-opt').forEach((b) => b.addEventListener('click', () => { wahl = b.dataset.bild || null; draw(); }));
+      app.querySelector('#picFile').addEventListener('change', async (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+        try { wahl = await shrinkSquare(f, 256); draw(); } catch (err) { out('wrong', err.message); }
+      });
+      app.querySelector('#picSave').addEventListener('click', save);
+    };
+    const out = (cls, t) => { app.querySelector('#picMsg').innerHTML = `<div class="msg ${cls}">${esc(t)}</div>`; };
+    async function save() {
+      try {
+        if (forOther) await syncCall('POST', 'user_update', { id: target.id, bild: wahl });
+        else await syncCall('POST', 'bild', { bild: wahl });
+        target.bild = wahl;
+        if (!forOther) { auth.kid.bild = wahl; saveAuth(); renderUser(); }
+        const n = (profileNames || []).find((x) => x.name === target.name);
+        if (n) { n.bild = wahl; try { localStorage.setItem(NKEY, JSON.stringify(profileNames)); } catch (e) { /* egal */ } }
+        out('ok', '✔ Profilbild gespeichert.');
+      } catch (err) {
+        out('wrong', err.status ? err.message : 'Keine Verbindung zum Server.');
+      }
+    }
+    draw();
+  }
+
   // ---------- Benutzerverwaltung (nur Admin) ----------
   async function renderAdmin() {
     document.title = 'Benutzer verwalten – Lernflix';
@@ -953,7 +1028,7 @@
     if (!isAdmin()) { app.innerHTML = '<div class="card"><h2>Nur für Admins</h2><a class="btn" href="#/">Zur Übersicht</a></div>'; return; }
     app.innerHTML = '<p class="muted">Lade Benutzer …</p>';
     let users;
-    try { users = (await syncCall('GET', 'users')).users; } catch (e) {
+    try { users = (await syncCall('GET', 'users')).users; adminUsers = users; } catch (e) {
       app.innerHTML = `<div class="card"><h2>Benutzer konnten nicht geladen werden</h2><p>${esc(e.message)}</p></div>`;
       return;
     }
@@ -982,6 +1057,7 @@
             </div>
           </div>
           <div class="actions">
+            <a class="btn" href="#/profilbild/${esc(u.id)}">Profilbild</a>
             <button class="btn" data-act="rename">Umbenennen</button>
             ${u.hat_passwort ? '<button class="btn" data-act="resetpw">Passwort zurücksetzen</button>' : ''}
             <button class="btn" data-act="rolle">${u.rolle === 'admin' ? 'Zum Kind machen' : 'Zum Admin machen'}</button>
