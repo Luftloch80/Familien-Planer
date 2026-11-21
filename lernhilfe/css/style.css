@@ -179,6 +179,38 @@ main { width: 100%; max-width: 920px; margin: 0 auto; padding: 20px 16px 40px; f
 .user-card .actions { margin-top: 12px; }
 .user-card .btn { font-size: .88rem; padding: 7px 12px; }
 
+/* Profil-Auswahl (Netflix-Stil) */
+body.no-user { background: #141414; color: #e5e5e5; }
+body.no-user .foot { display: none; }
+body.no-user main { max-width: 960px; }
+.profiles-page { min-height: calc(100vh - 40px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; padding: 32px 0; text-align: center; }
+.profiles-page h1 { font-size: clamp(1.8rem, 5vw, 3.2rem); font-weight: 600; color: #fff; margin: 0; letter-spacing: -.01em; }
+.profiles { display: flex; flex-wrap: wrap; justify-content: center; gap: clamp(14px, 3vw, 32px); max-width: 860px; }
+.profile { display: flex; flex-direction: column; align-items: center; gap: 12px; border: 0; background: none; padding: 0; cursor: pointer; font: inherit; color: #808080; width: clamp(104px, 22vw, 150px); }
+.profile-pic {
+  position: relative; display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 1; border-radius: 8px;
+  font-size: clamp(2.4rem, 7vw, 3.8rem); font-weight: 700; color: rgba(255,255,255,.95); border: 3px solid transparent;
+  transition: transform .15s ease, border-color .15s ease; box-shadow: inset 0 -30px 50px rgba(0,0,0,.18);
+}
+.profile-badge { position: absolute; right: 6px; bottom: 4px; font-size: 1.1rem; }
+.profile-name { font-size: clamp(.95rem, 2.2vw, 1.25rem); transition: color .15s; }
+.profile:not(:disabled):hover .profile-pic, .profile:not(:disabled):focus-visible .profile-pic { border-color: #fff; transform: scale(1.04); }
+.profile:not(:disabled):hover .profile-name, .profile:focus-visible .profile-name { color: #fff; }
+.profile:focus-visible { outline: none; }
+.profile:disabled { cursor: default; color: #fff; }
+.profiles.single .profile { width: 130px; }
+.profiles-empty { color: #999; }
+.pass-form { width: 100%; max-width: 340px; display: flex; flex-direction: column; text-align: left; gap: 6px; }
+.pass-form label { color: #bbb; font-size: .9rem; font-weight: 600; }
+.pass-form input { background: #333; border-color: #333; color: #fff; font-size: 1.05rem; padding: 10px 12px; }
+.pass-form input:focus { border-color: #fff; box-shadow: none; }
+.pass-form .btn.primary { background: #e50914; border-color: #e50914; margin-top: 8px; padding: 11px; }
+.pass-form .first-login { background: #262626; color: #ddd; }
+.pass-form .back-link { color: #aaa; text-decoration: none; margin-top: 10px; align-self: center; }
+.pass-form .back-link:hover { color: #fff; }
+.profiles-page #lgMsg { width: 100%; max-width: 340px; }
+@media (max-width: 520px) { .profiles { max-width: 340px; } }
+
 /* Fotos */
 .small-hero { padding: 8px 0 4px; }
 .small-hero h1 { font-size: 1.9rem; }

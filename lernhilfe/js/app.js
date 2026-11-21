@@ -10,7 +10,6 @@
   // Anmelden selbst fest). Der Lernstand wird sofort auf dem Gerät und im
   // Hintergrund in der Datenbank gespeichert (api/lernstand.php).
   const AKEY = 'lernhilfe:auth';
-  const DKEY = 'lernhilfe:geraet';
   const SYNC_API = 'api/lernstand.php';
   let auth = null; // { token, kid: { id, name, color, rolle }, rev }
   try { auth = JSON.parse(localStorage.getItem(AKEY) || 'null'); } catch (e) { auth = null; }
@@ -20,15 +19,6 @@
   const isAdmin = () => !!(currentKid() && currentKid().rolle === 'admin');
   function saveAuth() {
     try { if (auth) localStorage.setItem(AKEY, JSON.stringify(auth)); else localStorage.removeItem(AKEY); } catch (e) { /* egal */ }
-  }
-  // Namen, die sich auf diesem Gerät schon angemeldet haben (für die Anmeldeseite)
-  function deviceNames() {
-    try { return JSON.parse(localStorage.getItem(DKEY) || '[]') || []; } catch (e) { return []; }
-  }
-  function rememberName(k) {
-    const list = deviceNames().filter((x) => x.name.toLowerCase() !== k.name.toLowerCase());
-    list.unshift({ name: k.name, color: k.color });
-    try { localStorage.setItem(DKEY, JSON.stringify(list.slice(0, 8))); } catch (e) { /* egal */ }
   }
   function authHeaders() {
     const h = {};
@@ -737,7 +727,6 @@
   function onLoggedIn(res) {
     auth = { token: res.token, kid: { id: res.kind.id, name: res.kind.name, color: res.kind.color, rolle: res.kind.rolle } };
     saveAuth();
-    rememberName(auth.kid);
     loadStore();
     store = mergeStores(store, res.kind.data);
     writeLocal(auth.kid.id, store);
@@ -771,7 +760,7 @@
   }
   function forceLogout() {
     const name = auth && auth.kid ? auth.kid.name : '';
-    loginState = { step: 'name', name, msg: 'Bitte melde dich neu an.' };
+    loginState = { step: 'name', msg: name ? `${name}, bitte melde dich neu an.` : 'Bitte melde dich neu an.' };
     clearSession();
   }
 
@@ -806,94 +795,103 @@
   }
   document.addEventListener('click', (e) => { if (!e.target.closest('#userBox')) closeUserMenu(); });
 
-  // ---------- Anmeldeseite ----------
+  // ---------- Anmeldeseite (Profil-Auswahl wie bei Netflix) ----------
   let loginState = { step: 'name' };
+  const NKEY = 'lernhilfe:namen';
+  let profileNames = null;
+  try { profileNames = JSON.parse(localStorage.getItem(NKEY) || 'null'); } catch (e) { profileNames = null; }
+  async function loadNames() {
+    try {
+      const d = await syncCall('GET', 'namen');
+      profileNames = d.namen || [];
+      try { localStorage.setItem(NKEY, JSON.stringify(profileNames)); } catch (e) { /* egal */ }
+      return true;
+    } catch (e) { return false; }
+  }
+
   function renderLogin() {
     document.title = 'Anmelden – Lernhilfe';
     document.body.dataset.subject = '';
     const side = document.getElementById('side');
     if (side) side.innerHTML = '';
     const st = loginState;
-    const known = deviceNames();
-    let form;
+    const tile = (k, attrs = '') => `<button type="button" class="profile" ${attrs}>
+        <span class="profile-pic" style="background:${esc(k.color || '#868e96')}">${esc(initials(k.name))}${k.admin ? '<span class="profile-badge" aria-hidden="true">⚙️</span>' : ''}</span>
+        <span class="profile-name">${esc(k.name)}</span></button>`;
+
     if (st.step === 'name') {
-      form = `
-        ${known.length ? `<div class="kids">${known.map((k) => `<button type="button" class="kid" data-name="${esc(k.name)}">${avatar(k, 'lg')}<span>${esc(k.name)}</span></button>`).join('')}</div>` : ''}
-        <form class="add-kid" id="loginForm" autocomplete="on">
-          <label for="lgName">Name</label>
-          <div class="add-row">
-            <input type="text" id="lgName" name="username" autocomplete="username" maxlength="30" placeholder="Vorname" autocapitalize="words" value="${esc(st.name || '')}">
-            <button class="btn primary" type="submit">Weiter</button>
-          </div>
-        </form>`;
-    } else {
-      const neu = st.step === 'neu';
-      form = `
-        <div class="kids"><div class="kid static">${avatar({ name: st.name, color: st.color || '#868e96' }, 'lg')}<span>${esc(st.name)}</span></div></div>
-        <form class="add-kid" id="loginForm" autocomplete="on">
+      const names = profileNames || [];
+      app.innerHTML = `
+        <section class="profiles-page">
+          <h1>Wer lernt gerade?</h1>
+          ${names.length ? `<div class="profiles">${names.map((k) => tile(k, `data-name="${esc(k.name)}"`)).join('')}</div>`
+            : `<p class="profiles-empty">${profileNames ? 'Noch keine Profile angelegt.' : 'Profile werden geladen …'}</p>`}
+          <div id="lgMsg" aria-live="polite">${st.msg ? `<div class="msg wrong">${esc(st.msg)}</div>` : ''}</div>
+        </section>`;
+      app.querySelectorAll('.profile[data-name]').forEach((b) => b.addEventListener('click', () => choose(b.dataset.name)));
+      if (!st.loaded) {
+        st.loaded = true;
+        loadNames().then((ok) => {
+          if (loginState !== st || currentKid()) return;
+          if (!ok && !profileNames) st.msg = 'Keine Verbindung zum Server. Bitte später nochmal versuchen.';
+          renderLogin();
+        });
+      }
+      return;
+    }
+
+    const neu = st.step === 'neu';
+    app.innerHTML = `
+      <section class="profiles-page">
+        <div class="profiles single">${tile({ name: st.name, color: st.color, admin: st.admin }, 'disabled')}</div>
+        <form class="pass-form" id="loginForm" autocomplete="on">
           <input type="text" name="username" autocomplete="username" value="${esc(st.name)}" hidden>
           ${neu ? `<p class="first-login">👋 Du meldest dich zum ersten Mal an. Denk dir ein Passwort aus (mindestens 4 Zeichen) und merke es dir gut.</p>` : ''}
           <label for="lgPass">${neu ? 'Neues Passwort' : 'Passwort'}</label>
           <input type="password" id="lgPass" autocomplete="${neu ? 'new-password' : 'current-password'}" class="full">
           ${neu ? `<label for="lgPass2">Passwort wiederholen</label><input type="password" id="lgPass2" autocomplete="new-password" class="full">` : ''}
-          ${neu && st.admin ? `<label for="lgCode">Zugangscode <span class="muted small">(steht bei GitHub als Secret LERNHILFE_CODE)</span></label><input type="password" id="lgCode" class="full" autocomplete="off">` : ''}
+          ${neu && st.admin ? `<label for="lgCode">Zugangscode <span class="small">(Secret LERNHILFE_CODE bei GitHub)</span></label><input type="password" id="lgCode" class="full" autocomplete="off">` : ''}
           <button class="btn primary full" type="submit">${neu ? 'Passwort speichern und anmelden' : 'Anmelden'}</button>
-          <button class="link small" type="button" id="lgBack">Anderer Name</button>
-        </form>`;
-    }
-    app.innerHTML = `
-      <section class="login">
-        <img src="favicon.svg" alt="" width="64" height="64">
-        <h1>${st.step === 'name' ? 'Wer lernt heute?' : `Hallo ${esc(st.name)}!`}</h1>
-        ${form}
+          <button class="link back-link" type="button" id="lgBack">← Anderes Profil</button>
+        </form>
         <div id="lgMsg" aria-live="polite">${st.msg ? `<div class="msg ${st.ok ? 'ok' : 'wrong'}">${esc(st.msg)}</div>` : ''}</div>
       </section>`;
     const msg = (t) => { app.querySelector('#lgMsg').innerHTML = t ? `<div class="msg wrong">${esc(t)}</div>` : ''; };
     const f = app.querySelector('#loginForm');
-    const busyBtn = (on) => { const b = f.querySelector('button[type=submit]'); b.disabled = on; };
-
-    async function checkName(name) {
-      name = name.trim();
-      if (!name) return;
+    const busyBtn = (on) => { f.querySelector('button[type=submit]').disabled = on; };
+    app.querySelector('#lgPass').focus();
+    app.querySelector('#lgBack').addEventListener('click', () => { loginState = { step: 'name' }; renderLogin(); });
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const pass = app.querySelector('#lgPass').value;
+      if (neu) {
+        if (pass.length < 4) return msg('Das Passwort muss mindestens 4 Zeichen haben.');
+        if (pass !== app.querySelector('#lgPass2').value) return msg('Die beiden Passwörter sind nicht gleich.');
+      }
       busyBtn(true);
       try {
-        const d = await syncCall('POST', 'status', { name });
-        const k = known.find((x) => x.name.toLowerCase() === d.name.toLowerCase());
-        loginState = { step: d.neu ? 'neu' : 'pass', name: d.name, admin: d.admin, color: k && k.color };
-        renderLogin();
-      } catch (e) {
+        const body = { name: st.name, passwort: pass };
+        const c = app.querySelector('#lgCode');
+        if (c) body.code = c.value;
+        onLoggedIn(await syncCall('POST', 'login', body));
+      } catch (err) {
         busyBtn(false);
-        msg(e.status ? e.message : 'Keine Verbindung zum Server. Bitte später nochmal versuchen.');
+        if (err.status === 409) { loginState = { step: 'pass', name: st.name, color: st.color, admin: st.admin, msg: err.message }; return renderLogin(); }
+        msg(err.status ? err.message : 'Keine Verbindung zum Server. Bitte später nochmal versuchen.');
       }
-    }
+    });
+  }
 
-    if (st.step === 'name') {
-      app.querySelectorAll('.kid[data-name]').forEach((b) => b.addEventListener('click', () => checkName(b.dataset.name)));
-      f.addEventListener('submit', (e) => { e.preventDefault(); checkName(app.querySelector('#lgName').value); });
-      if (!known.length) app.querySelector('#lgName').focus();
-    } else {
-      app.querySelector('#lgPass').focus();
-      app.querySelector('#lgBack').addEventListener('click', () => { loginState = { step: 'name' }; renderLogin(); });
-      f.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const pass = app.querySelector('#lgPass').value;
-        if (st.step === 'neu') {
-          if (pass.length < 4) return msg('Das Passwort muss mindestens 4 Zeichen haben.');
-          if (pass !== app.querySelector('#lgPass2').value) return msg('Die beiden Passwörter sind nicht gleich.');
-        }
-        busyBtn(true);
-        try {
-          const body = { name: st.name, passwort: pass };
-          const c = app.querySelector('#lgCode');
-          if (c) body.code = c.value;
-          onLoggedIn(await syncCall('POST', 'login', body));
-        } catch (err) {
-          busyBtn(false);
-          msg(err.status ? err.message : 'Keine Verbindung zum Server. Bitte später nochmal versuchen.');
-          if (err.status === 409) { loginState = { step: 'pass', name: st.name, msg: err.message }; renderLogin(); }
-        }
-      });
+  async function choose(name) {
+    const k = (profileNames || []).find((x) => x.name === name) || { name };
+    try {
+      const d = await syncCall('POST', 'status', { name });
+      loginState = { step: d.neu ? 'neu' : 'pass', name: d.name, admin: d.admin, color: k.color };
+    } catch (e) {
+      loginState = { step: 'name', loaded: true, msg: e.status ? e.message : 'Keine Verbindung zum Server. Bitte später nochmal versuchen.' };
+      if (e.status === 404) loadNames().then(() => renderLogin());
     }
+    renderLogin();
   }
 
   // ---------- Passwort ändern ----------

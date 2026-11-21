@@ -2,6 +2,7 @@
 // Anmeldung, Lernstand und Benutzerverwaltung der Lernhilfe
 //
 // Anmeldung (ohne Token):
+//   GET  ?action=namen                                  -> {"namen":[{name,color,admin}]}  (Profil-Auswahl)
 //   POST ?action=status  {name}                         -> {"neu":bool,"admin":bool}  (neu = noch kein Passwort)
 //   POST ?action=login   {name,passwort,code?}          -> {"token","kind":{...,data}}
 //        Beim ersten Anmelden legt das Kind sein Passwort mit "passwort" fest.
@@ -86,6 +87,12 @@ try {
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
     switch ("$method $action") {
+        case 'GET namen': {
+            // nur Namen und Farben für die Profil-Auswahl auf der Startseite
+            $rows = db()->query("SELECT id, name, color, rolle FROM lernhilfe_kinder ORDER BY rolle = 'admin', name")->fetchAll();
+            echo json_encode(['namen' => array_map(fn ($r) => ['name' => $r['name'], 'color' => $r['color'], 'admin' => $r['rolle'] === 'admin'], $rows)], JSON_FLAGS);
+            break;
+        }
         case 'POST status': {
             $b = readBody();
             $r = findByName((string)($b['name'] ?? ''));
