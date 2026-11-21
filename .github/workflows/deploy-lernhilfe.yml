@@ -87,3 +87,13 @@ jobs:
               mirror -R --parallel=8 --ignore-time lernhilfe/api/vendor/ \"$REMOTE_DIR/api/vendor\"
             "
           fi
+
+      - name: Schnittstellen prüfen
+        env:
+          SITE: ${{ secrets.LERNHILFE_URL || 'https://lernhilfe.luftloch.com' }}
+        run: |
+          for path in "api/lernstand.php?action=namen" "api/api.php?action=list"; do
+            echo "== $SITE/$path"
+            curl -sS -m 30 -o /tmp/body -w "HTTP %{http_code}\n" "$SITE/$path" || true
+            head -c 600 /tmp/body | sed -e 's/"token":"[^"]*"/"token":"…"/g'; echo
+          done

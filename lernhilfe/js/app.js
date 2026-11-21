@@ -89,7 +89,9 @@
       headers: Object.assign(body ? { 'Content-Type': 'application/json' } : {}, authHeaders()),
       body: body ? JSON.stringify(body) : undefined,
     });
-    const d = await r.json().catch(() => ({}));
+    const text = await r.text();
+    let d = {};
+    try { d = JSON.parse(text); } catch (e) { d = { error: text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160) || 'keine Antwort' }; }
     if (r.status === 409 && d.kind) return { conflict: true, kind: d.kind };
     if (r.status === 401 && d.abgemeldet && auth) { forceLogout(); throw new Error(d.error || 'Bitte neu anmelden'); }
     if (!r.ok) { const e = new Error(d.error || 'Fehler ' + r.status); e.status = r.status; throw e; }
@@ -799,6 +801,7 @@
   let loginState = { step: 'name' };
   const NKEY = 'lernhilfe:namen';
   let profileNames = null;
+  let loadNamesError = '';
   try { profileNames = JSON.parse(localStorage.getItem(NKEY) || 'null'); } catch (e) { profileNames = null; }
   async function loadNames() {
     try {
@@ -806,7 +809,7 @@
       profileNames = d.namen || [];
       try { localStorage.setItem(NKEY, JSON.stringify(profileNames)); } catch (e) { /* egal */ }
       return true;
-    } catch (e) { return false; }
+    } catch (e) { loadNamesError = e.status ? `Server-Fehler ${e.status}: ${e.message}` : ''; return false; }
   }
 
   function renderLogin() {
@@ -833,7 +836,7 @@
         st.loaded = true;
         loadNames().then((ok) => {
           if (loginState !== st || currentKid()) return;
-          if (!ok && !profileNames) st.msg = 'Keine Verbindung zum Server. Bitte später nochmal versuchen.';
+          if (!ok && !profileNames) st.msg = loadNamesError || 'Keine Verbindung zum Server. Bitte später nochmal versuchen.';
           renderLogin();
         });
       }
