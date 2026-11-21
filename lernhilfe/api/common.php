@@ -147,13 +147,3 @@ function requireAdmin(): array
     if ($u['rolle'] !== 'admin') fail(403, 'Nur für Admins');
     return $u;
 }
-
-// Angemeldet oder alter Zugangscode (für die Fotoerkennung)
-function requireUserOrCode(): void
-{
-    if (currentUser()) return;
-    $code = (string)(config()['code'] ?? '');
-    $given = (string)($_SERVER['HTTP_X_LERNHILFE_CODE'] ?? '');
-    if ($code !== '' && $given !== '' && hash_equals($code, $given)) return;
-    fail(401, 'Bitte anmelden', ['abgemeldet' => currentUser() === null && bearerToken() !== '']);
-}

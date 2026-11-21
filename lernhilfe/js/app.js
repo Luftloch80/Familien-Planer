@@ -33,7 +33,6 @@
   function authHeaders() {
     const h = {};
     if (auth && auth.token) h['X-Lernhilfe-Token'] = auth.token;
-    if (store && store.prefs && store.prefs.code) h['X-Lernhilfe-Code'] = store.prefs.code;
     return h;
   }
 
@@ -67,6 +66,7 @@
     if (fp !== lastFp) { lastFp = fp; scheduleSync(); }
   }
   loadStore();
+  if (store.prefs.code) { delete store.prefs.code; }
   lastFp = progressFp(store);
 
   // Zwei Stände zusammenführen: pro Vokabel gewinnt die neuere Antwort,
@@ -589,14 +589,9 @@
       headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
       body: JSON.stringify(body),
     });
-    let r = await send();
-    if (r.status === 401) {
-      const c = prompt('Zugangscode:');
-      if (!c) throw new Error('Kein Zugangscode');
-      store.prefs.code = c.trim(); save();
-      r = await send();
-    }
+    const r = await send();
     const d = await r.json().catch(() => ({}));
+    if (r.status === 401) { forceLogout(); throw new Error('Bitte neu anmelden'); }
     if (!r.ok) throw new Error(d.error || 'Fehler ' + r.status);
     if (d.themen) setRemote(d.themen);
     return d;
@@ -1046,10 +1041,6 @@
     let status = '';
     if (busy) {
       status = `<div class="busy"><span class="spinner" aria-hidden="true"></span><div><b>Fotos werden ausgewertet …</b><br><span class="muted small">Fach und Thema erkennen, Vokabeln, Erklärungen und Übungen erstellen. Das dauert meist 1–2 Minuten. <span id="elapsed"></span></span></div></div>`;
-    } else if (r && r.needCode) {
-      status = `<form class="code-form" id="codeForm"><p>${esc(r.error || 'Bitte den Zugangscode eingeben.')}</p>
-        <input type="password" id="codeIn" placeholder="Zugangscode" autocomplete="current-password" aria-label="Zugangscode">
-        <button class="btn primary" type="submit">Weiter</button></form>`;
     } else if (r && r.error) {
       status = `<div class="msg wrong">✘ ${esc(r.error)}</div>`;
     } else if (r && r.ok === false) {
@@ -1105,15 +1096,6 @@
       renderFotos();
     }));
     app.querySelector('#go').addEventListener('click', analyzePhotos);
-    const cf = app.querySelector('#codeForm');
-    if (cf) {
-      cf.querySelector('input').focus();
-      cf.addEventListener('submit', (e) => {
-        e.preventDefault();
-        store.prefs.code = cf.querySelector('input').value.trim(); save();
-        analyzePhotos();
-      });
-    }
     if (busy) tickElapsed();
   }
   const MAX_PHOTOS = 8;
@@ -1163,7 +1145,7 @@
       });
       const d = await r.json().catch(() => ({ error: `Der Server hat nicht richtig geantwortet (${r.status}).` }));
       if (r.status === 401) {
-        lastResult = { needCode: true, error: store.prefs.code ? 'Der Zugangscode stimmt nicht. Bitte nochmal eingeben.' : 'Bitte den Zugangscode eingeben.' };
+        busy = false; forceLogout(); return;
       } else if (!r.ok) {
         lastResult = { error: d.error || `Fehler ${r.status}` };
       } else {
@@ -1189,13 +1171,8 @@
       body: JSON.stringify({ id: subj.remote.id }),
     });
     try {
-      let r = await send();
-      if (r.status === 401) {
-        const c = prompt('Zugangscode:');
-        if (!c) return;
-        store.prefs.code = c.trim(); save();
-        r = await send();
-      }
+      const r = await send();
+      if (r.status === 401) { forceLogout(); return; }
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || r.status);
       setRemote(d.themen);
@@ -1230,7 +1207,7 @@
         <a class="btn" href="${printLink(subj.fach, epocheOf(t ? { t } : { builtin: true, subj }))}">🖨️ Lern-PDF dieser Epoche</a>
         ${t && t.static ? `<p class="muted small">Epoche: ${esc((t.data && t.data.epoche) || OHNE_EPOCHE)}</p>` : ''}
         ${t && !t.static ? `<p class="muted small">Aus ${verlauf.reduce((n, v) => n + (v.fotos || 0), 0)} Fotos erstellt${verlauf.length > 1 ? ` (${verlauf.length} Auswertungen)` : ''}.
-        <button type="button" class="link" id="delTopic">Thema löschen</button></p>` : ''}
+        ${isAdmin() ? '<button type="button" class="link" id="delTopic">Thema löschen</button>' : ''}</p>` : ''}
       </footer>`;
     const view = document.getElementById('view');
     ({

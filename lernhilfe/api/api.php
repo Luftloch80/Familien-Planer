@@ -9,8 +9,7 @@
 // POST api.php?action=update   {"id":123,"epoche":"…"} -> Epoche/Titel ändern
 // POST api.php?action=delete   {"id":123}  -> Thema löschen
 //
-// analyze, update und delete verlangen den Zugangscode im Header X-Lernhilfe-Code,
-// sofern in config.php einer gesetzt ist.
+// analyze und update verlangen eine Anmeldung (Header X-Lernhilfe-Token), delete einen Admin.
 
 declare(strict_types=1);
 
@@ -179,7 +178,7 @@ TXT;
 
 function analyze(): void
 {
-    requireUserOrCode();
+    requireUser();
     $body = readJsonBody();
     $images = $body['images'] ?? null;
     if (!is_array($images) || !$images) fail(400, 'Keine Fotos');
@@ -381,7 +380,7 @@ function saveResult(array $r, array $themen, int $fotos): array
 // Epoche (oder Titel) eines Themas von Hand ändern
 function updateThema(): void
 {
-    requireUserOrCode();
+    requireUser();
     $body = readJsonBody();
     $id = (int)($body['id'] ?? 0);
     if ($id <= 0) fail(400, 'id fehlt');
@@ -411,7 +410,7 @@ try {
     $action = $_GET['action'] ?? '';
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
     if ($action === 'list' && $method === 'GET') {
-        echo json_encode(['themen' => loadThemen(), 'code' => (string)(config()['code'] ?? '') !== ''], JSON_FLAGS);
+        echo json_encode(['themen' => loadThemen()], JSON_FLAGS);
     } elseif ($action === 'analyze' && $method === 'POST') {
         analyze();
     } elseif ($action === 'update' && $method === 'POST') {
