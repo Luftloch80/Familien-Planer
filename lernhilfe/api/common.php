@@ -51,6 +51,11 @@ function db(): PDO
     if (!in_array('pass_hash', $cols, true)) $pdo->exec('ALTER TABLE lernhilfe_kinder ADD pass_hash VARCHAR(255) NULL');
     if (!in_array('rolle', $cols, true)) $pdo->exec("ALTER TABLE lernhilfe_kinder ADD rolle VARCHAR(10) NOT NULL DEFAULT 'kind'");
     if (!in_array('bild', $cols, true)) $pdo->exec('ALTER TABLE lernhilfe_kinder ADD bild MEDIUMTEXT NULL');
+    if (!in_array('material', $cols, true)) {
+        // Recht, neues Material (Fotos) hinzuzufügen; Admins dürfen es immer
+        $pdo->exec('ALTER TABLE lernhilfe_kinder ADD material TINYINT(1) NOT NULL DEFAULT 0');
+        $pdo->exec("UPDATE lernhilfe_kinder SET material = 1 WHERE LOWER(name) = 'emma'");
+    }
     $pdo->exec(
         'CREATE TABLE IF NOT EXISTS lernhilfe_sessions (
             token_hash CHAR(64) NOT NULL PRIMARY KEY,
@@ -139,6 +144,19 @@ function requireUser(): array
 {
     $u = currentUser();
     if (!$u) fail(401, 'Bitte neu anmelden', ['abgemeldet' => true]);
+    return $u;
+}
+
+// Darf neues Material hinzufügen (Admin oder freigeschaltetes Kind)
+function canAddMaterial(array $u): bool
+{
+    return $u['rolle'] === 'admin' || (int)($u['material'] ?? 0) === 1;
+}
+
+function requireMaterial(): array
+{
+    $u = requireUser();
+    if (!canAddMaterial($u)) fail(403, 'Neues Material dürfen nur bestimmte Benutzer hinzufügen.');
     return $u;
 }
 

@@ -17,6 +17,8 @@
   const keyFor = (id) => 'lernhilfe:v1:' + id;
   const currentKid = () => (auth && auth.token && auth.kid) || null;
   const isAdmin = () => !!(currentKid() && currentKid().rolle === 'admin');
+  // Neues Material hinzufügen: Admins und freigeschaltete Kinder
+  const darfMaterial = () => FOTOS_AKTIV && !!(currentKid() && (currentKid().rolle === 'admin' || currentKid().material));
   function saveAuth() {
     try { if (auth) localStorage.setItem(AKEY, JSON.stringify(auth)); else localStorage.removeItem(AKEY); } catch (e) { /* egal */ }
   }
@@ -128,8 +130,9 @@
           server = res.kind;
         }
         // Name/Farbe/Rolle könnten sich geändert haben
-        if (server && auth && auth.kid && (auth.kid.name !== server.name || auth.kid.rolle !== server.rolle || auth.kid.color !== server.color || (auth.kid.bild || null) !== (server.bild || null))) {
-          Object.assign(auth.kid, { name: server.name, rolle: server.rolle, color: server.color, bild: server.bild || null });
+        if (server && auth && auth.kid && (auth.kid.name !== server.name || auth.kid.rolle !== server.rolle || auth.kid.color !== server.color || (auth.kid.bild || null) !== (server.bild || null) || !!auth.kid.material !== !!server.material)) {
+          Object.assign(auth.kid, { name: server.name, rolle: server.rolle, color: server.color, bild: server.bild || null, material: !!server.material });
+          if (location.hash === '#/' || location.hash === '') route(true);
           saveAuth();
           renderUser();
           renderSide();
@@ -475,7 +478,7 @@
       </div>
       <nav class="nav-list" aria-label="Hauptmenü">
         <a href="#/" class="${here === '#/' ? 'active' : ''}"><span class="ni" aria-hidden="true">🏠</span>Übersicht</a>
-        ${FOTOS_AKTIV ? `<a href="#/fotos" class="${here === '#/fotos' ? 'active' : ''}"><span class="ni" aria-hidden="true">📷</span>Neues Material</a>` : ''}
+        ${darfMaterial() ? `<a href="#/fotos" class="${here === '#/fotos' ? 'active' : ''}"><span class="ni" aria-hidden="true">📷</span>Neues Material</a>` : ''}
         ${isAdmin() ? `<a href="#/admin" class="${here === '#/admin' ? 'active' : ''}"><span class="ni" aria-hidden="true">⚙️</span>Benutzer verwalten</a>` : ''}
       </nav>
       <div class="nav-sep"></div>
@@ -536,7 +539,7 @@
     if (parts[0] === 'admin') { renderSide('#/admin'); return renderAdmin(); }
     if (parts[0] === 'profilbild') { renderSide(''); return renderProfilbild(parts[1] || ''); }
     if (parts[0] === 'passwort') { renderSide(''); return renderPasswort(); }
-    if (parts[0] === 'fotos' && FOTOS_AKTIV) { renderSide('#/fotos'); return renderFotos(); }
+    if (parts[0] === 'fotos' && darfMaterial()) { renderSide('#/fotos'); return renderFotos(); }
     if (!subj) { renderSide('#/'); return renderStart(); }
     currentFach = subj.fach;
     store.prefs.fach = currentFach; save();
@@ -704,7 +707,7 @@
         </div>
         <div class="topic-list">${g.topics.map((x) => topicCard(x)).join('')}</div>
       </section>`).join('') || '<p class="muted">Noch keine Themen.</p>'}
-      ${FOTOS_AKTIV ? `<a class="btn" href="#/fotos">📷 Neues Material zu ${esc(fachName(fach))} hinzufügen</a>` : ''}`;
+      ${darfMaterial() ? `<a class="btn" href="#/fotos">📷 Neues Material zu ${esc(fachName(fach))} hinzufügen</a>` : ''}`;
   }
   function topicCard(x) {
     const p = progressOf(x.subj);
@@ -735,7 +738,7 @@
   const avatar = (k, cls = '') => `<span class="avatar ${cls}" style="background:${esc(k.color || '#868e96')}" aria-hidden="true">${picFace(k)}</span>`;
 
   function onLoggedIn(res) {
-    auth = { token: res.token, kid: { id: res.kind.id, name: res.kind.name, color: res.kind.color, rolle: res.kind.rolle, bild: res.kind.bild || null } };
+    auth = { token: res.token, kid: { id: res.kind.id, name: res.kind.name, color: res.kind.color, rolle: res.kind.rolle, bild: res.kind.bild || null, material: !!res.kind.material } };
     saveAuth();
     loadStore();
     store = mergeStores(store, res.kind.data);
@@ -1054,12 +1057,14 @@
             <div class="uc-name"><span><b>${esc(u.name)}</b>${u.id === me.id ? ' <span class="tag">du</span>' : ''}</span>
               <span class="muted small">${u.rolle === 'admin' ? 'Admin' : 'Kind'} · ${u.hat_passwort ? 'Passwort gesetzt' : '<b>wartet auf erstes Anmelden</b>'} · zuletzt aktiv: ${when(u.zuletzt)}</span>
               <span class="muted small">Lernstand: ${u.stand.vokabeln} Vokabeln sicher · ${u.stand.uebungen} Übungen geschafft</span>
+              <span class="muted small">${u.rolle === 'admin' ? '📷 Darf neues Material hinzufügen (Admin)' : u.material ? '📷 Darf neues Material hinzufügen' : 'Darf kein neues Material hinzufügen'}</span>
             </div>
           </div>
           <div class="actions">
             <a class="btn" href="#/profilbild/${esc(u.id)}">Profilbild</a>
             <button class="btn" data-act="rename">Umbenennen</button>
             ${u.hat_passwort ? '<button class="btn" data-act="resetpw">Passwort zurücksetzen</button>' : ''}
+            ${u.rolle !== 'admin' ? `<button class="btn" data-act="material">${u.material ? 'Material sperren' : 'Material erlauben'}</button>` : ''}
             <button class="btn" data-act="rolle">${u.rolle === 'admin' ? 'Zum Kind machen' : 'Zum Admin machen'}</button>
             <button class="btn" data-act="resetstand">Lernstand löschen</button>
             ${u.id !== me.id ? '<button class="btn bad" data-act="delete">Löschen</button>' : ''}
@@ -1088,6 +1093,8 @@
           if (confirm(`Passwort von ${u.name} zurücksetzen? ${u.name} legt beim nächsten Anmelden ein neues fest und wird auf allen Geräten abgemeldet.`)) {
             run(() => syncCall('POST', 'user_update', { id: u.id, reset_passwort: true }));
           }
+        } else if (act === 'material') {
+          run(() => syncCall('POST', 'user_update', { id: u.id, material: !u.material }));
         } else if (act === 'rolle') {
           run(() => syncCall('POST', 'user_update', { id: u.id, rolle: u.rolle === 'admin' ? 'kind' : 'admin' }));
         } else if (act === 'resetstand') {
@@ -1132,7 +1139,7 @@
         <p>Such dir ein Thema aus und leg los. Pro Epoche kannst du dir ein Lernheft als PDF drucken.</p>
         <div class="actions">
           ${angefangen.length ? `<a class="btn primary" href="${angefangen[0].subj.route}">▶ Weiterlernen</a>` : ''}
-          ${FOTOS_AKTIV ? `<a class="btn" href="#/fotos">📷 Neues Material</a>` : ''}
+          ${darfMaterial() ? `<a class="btn" href="#/fotos">📷 Neues Material</a>` : ''}
         </div>
       </section>
       ${row('Weiterlernen', '', angefangen)}
@@ -1306,7 +1313,7 @@
         `<a role="tab" href="${subj.route}/${id}" class="${id === tab ? 'active' : ''}" aria-selected="${id === tab}">${label}</a>`).join('')}</div>
       <div id="view"></div>
       <footer class="topic-foot">
-        ${t && !t.static ? `<form class="epoche-form" id="epForm">
+        ${t && !t.static && darfMaterial() ? `<form class="epoche-form" id="epForm">
           <label for="epIn">Epoche</label>
           <input type="text" id="epIn" list="epList" value="${esc((t.data && t.data.epoche) || '')}" placeholder="z. B. Geometrie" maxlength="100">
           <datalist id="epList">${epochenOf(subj.fach).filter((g) => g.name).map((g) => `<option value="${esc(g.name)}">`).join('')}</datalist>

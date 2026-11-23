@@ -16,7 +16,7 @@
 // Nur Admin:
 //   GET  ?action=users                                  -> {"users":[...]}
 //   POST ?action=user_add    {name,rolle}
-//   POST ?action=user_update {id,name?,rolle?,bild?,reset_passwort?,reset_stand?}
+//   POST ?action=user_update {id,name?,rolle?,bild?,material?,reset_passwort?,reset_stand?}
 //   POST ?action=user_delete {id}
 
 declare(strict_types=1);
@@ -31,7 +31,7 @@ const MIN_PASSWORT = 4;
 
 function kindOut(array $r, bool $withData): array
 {
-    $k = ['id' => $r['id'], 'name' => $r['name'], 'color' => $r['color'], 'rolle' => $r['rolle'], 'bild' => $r['bild'] ?? null, 'ts' => (int)$r['ts']];
+    $k = ['id' => $r['id'], 'name' => $r['name'], 'color' => $r['color'], 'rolle' => $r['rolle'], 'bild' => $r['bild'] ?? null, 'material' => canAddMaterial($r), 'ts' => (int)$r['ts']];
     if ($withData) {
         $d = json_decode($r['data'], true);
         $k['data'] = is_array($d) && $d ? $d : new stdClass();
@@ -222,6 +222,9 @@ try {
                 $rolle = $b['rolle'] === 'admin' ? 'admin' : 'kind';
                 if ($rolle === 'kind' && $r['rolle'] === 'admin' && adminCount() <= 1) fail(409, 'Es muss mindestens einen Admin geben.');
                 db()->prepare('UPDATE lernhilfe_kinder SET rolle = ? WHERE id = ?')->execute([$rolle, $r['id']]);
+            }
+            if (isset($b['material'])) {
+                db()->prepare('UPDATE lernhilfe_kinder SET material = ? WHERE id = ?')->execute([$b['material'] ? 1 : 0, $r['id']]);
             }
             if (array_key_exists('bild', $b)) {
                 db()->prepare('UPDATE lernhilfe_kinder SET bild = ? WHERE id = ?')->execute([cleanBild($b['bild']), $r['id']]);

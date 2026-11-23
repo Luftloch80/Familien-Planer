@@ -178,7 +178,7 @@ TXT;
 
 function analyze(): void
 {
-    requireUser();
+    requireMaterial();
     $body = readJsonBody();
     $images = $body['images'] ?? null;
     if (!is_array($images) || !$images) fail(400, 'Keine Fotos');
@@ -380,7 +380,7 @@ function saveResult(array $r, array $themen, int $fotos): array
 // Epoche (oder Titel) eines Themas von Hand ändern
 function updateThema(): void
 {
-    requireUser();
+    requireMaterial();
     $body = readJsonBody();
     $id = (int)($body['id'] ?? 0);
     if ($id <= 0) fail(400, 'id fehlt');
