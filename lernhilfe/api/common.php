@@ -87,6 +87,19 @@ function db(): PDO
     foreach ($pdo->query('SHOW COLUMNS FROM lernhilfe_themen')->fetchAll() as $col) {
         if ($col['Field'] === 'basis' && $col['Type'] !== 'varchar(80)') $pdo->exec('ALTER TABLE lernhilfe_themen MODIFY basis VARCHAR(80) NULL');
     }
+    // Einmalige Einrichtungsschritte (jeder Schritt läuft nur ein einziges Mal)
+    $pdo->exec('CREATE TABLE IF NOT EXISTS lernhilfe_meta (schluessel VARCHAR(60) NOT NULL PRIMARY KEY, wert TEXT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+    einmalig($pdo, 'benutzer_2026_11_24', function (PDO $pdo) {
+        $farben = ['#e8590c', '#1c7ed6', '#2b8a3e', '#d6336c', '#7048e8', '#0c8599', '#f08c00', '#c2255c'];
+        $n = (int)$pdo->query('SELECT COUNT(*) FROM lernhilfe_kinder')->fetchColumn();
+        foreach (['Vincent', 'Hanna', 'Lea', 'Salome', 'Grete'] as $name) {
+            $s = $pdo->prepare('SELECT COUNT(*) FROM lernhilfe_kinder WHERE LOWER(name) = LOWER(?)');
+            $s->execute([$name]);
+            if ((int)$s->fetchColumn() > 0) continue;
+            $pdo->prepare("INSERT INTO lernhilfe_kinder (id, name, color, ts, data, rolle) VALUES (?, ?, ?, 0, '{}', 'kind')")
+                ->execute(['k' . bin2hex(random_bytes(6)), $name, $farben[$n++ % count($farben)]]);
+        }
+    });
     // Gibt es noch keinen Admin, wird "Admin" angelegt. Sein erstes Passwort
     // kann nur mit dem Zugangscode (Secret LERNHILFE_CODE) festgelegt werden.
     $admins = (int)$pdo->query("SELECT COUNT(*) FROM lernhilfe_kinder WHERE rolle = 'admin'")->fetchColumn();
@@ -101,6 +114,14 @@ function db(): PDO
         }
     }
     return $pdo;
+}
+
+// Führt $schritt genau einmal aus (Merker in lernhilfe_meta)
+function einmalig(PDO $pdo, string $schluessel, callable $schritt): void
+{
+    $s = $pdo->prepare('INSERT IGNORE INTO lernhilfe_meta (schluessel, wert) VALUES (?, NOW())');
+    $s->execute([$schluessel]);
+    if ($s->rowCount() === 1) $schritt($pdo);
 }
 
 function readBody(int $max = 2097152): array
