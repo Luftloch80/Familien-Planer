@@ -76,6 +76,9 @@ function db(): PDO
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
     );
+    // besitzer = NULL: gemeinsames Thema für alle; sonst nur für diesen Benutzer
+    $tcols = array_column($pdo->query('SHOW COLUMNS FROM lernhilfe_themen')->fetchAll(), 'Field');
+    if (!in_array('besitzer', $tcols, true)) $pdo->exec('ALTER TABLE lernhilfe_themen ADD besitzer VARCHAR(40) NULL, ADD INDEX (besitzer)');
     foreach ($pdo->query('SHOW COLUMNS FROM lernhilfe_themen')->fetchAll() as $col) {
         if ($col['Field'] === 'basis' && $col['Type'] !== 'varchar(80)') $pdo->exec('ALTER TABLE lernhilfe_themen MODIFY basis VARCHAR(80) NULL');
     }
@@ -147,17 +150,15 @@ function requireUser(): array
     return $u;
 }
 
-// Darf neues Material hinzufügen (Admin oder freigeschaltetes Kind)
+// Neues Material darf jeder angemeldete Benutzer hinzufügen (es bleibt privat)
 function canAddMaterial(array $u): bool
 {
-    return $u['rolle'] === 'admin' || (int)($u['material'] ?? 0) === 1;
+    return true;
 }
 
 function requireMaterial(): array
 {
-    $u = requireUser();
-    if (!canAddMaterial($u)) fail(403, 'Neues Material dürfen nur bestimmte Benutzer hinzufügen.');
-    return $u;
+    return requireUser();
 }
 
 function requireAdmin(): array

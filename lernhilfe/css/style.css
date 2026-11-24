@@ -587,3 +587,4 @@ select, input[type=text], input[type=password], textarea { background: #2a2a2a; 
 .pic-opt:hover { border-color: rgba(255,255,255,.5); }
 .pic-opt.sel { border-color: #fff; }
 .pic-page .actions { justify-content: center; }
+.tile-privat { position: absolute; left: 10px; bottom: 30px; font-size: .8rem; opacity: .85; }

@@ -18,7 +18,9 @@
   const currentKid = () => (auth && auth.token && auth.kid) || null;
   const isAdmin = () => !!(currentKid() && currentKid().rolle === 'admin');
   // Neues Material hinzufügen: Admins und freigeschaltete Kinder
-  const darfMaterial = () => FOTOS_AKTIV && !!(currentKid() && (currentKid().rolle === 'admin' || currentKid().material));
+  const darfMaterial = () => FOTOS_AKTIV && !!currentKid();
+  // Thema ändern/löschen: eigene Themen, gemeinsame nur als Admin
+  const darfBearbeiten = (t) => !!(t && !t.static && currentKid() && (t.privat || currentKid().rolle === 'admin'));
   function saveAuth() {
     try { if (auth) localStorage.setItem(AKEY, JSON.stringify(auth)); else localStorage.removeItem(AKEY); } catch (e) { /* egal */ }
   }
@@ -321,17 +323,24 @@
   let busy = false;
   let photos = [];
   let lastResult = null;
-  try { remote = JSON.parse(localStorage.getItem('lernhilfe:themen') || '[]') || []; } catch (e) { remote = []; }
+  // Themenliste je Benutzer zwischenspeichern (eigene Themen sind privat)
+  const themenKey = () => 'lernhilfe:themen:' + (currentKid() ? currentKid().id : 'alle');
+  function readRemoteCache() {
+    try { remote = JSON.parse(localStorage.getItem(themenKey()) || '[]') || []; } catch (e) { remote = []; }
+    try { subjCache.clear(); } catch (e) { /* beim Start noch nicht angelegt */ }
+  }
+  try { localStorage.removeItem('lernhilfe:themen'); } catch (e) { /* alte Version */ }
+  readRemoteCache();
 
   function setRemote(list) {
     remote = Array.isArray(list) ? list : [];
     subjCache.clear();
-    try { localStorage.setItem('lernhilfe:themen', JSON.stringify(remote)); } catch (e) { /* egal */ }
+    try { localStorage.setItem(themenKey(), JSON.stringify(remote)); } catch (e) { /* egal */ }
   }
   async function loadRemote() {
     if (!FOTOS_AKTIV) { renderSide(); return; }
     try {
-      const r = await fetch(API + '?action=list', { cache: 'no-store' });
+      const r = await fetch(API + '?action=list', { cache: 'no-store', headers: authHeaders() });
       if (!r.ok) throw new Error(String(r.status));
       const d = await r.json();
       apiOk = true;
@@ -714,7 +723,7 @@
     const d = x.t ? x.t.data || {} : null;
     const when = x.t && x.t.updated_at ? new Date(String(x.t.updated_at).replace(' ', 'T')).toLocaleDateString('de-DE') : '';
     return `<a class="topic-card" href="${x.subj.route}">
-      <span class="topic-title">${esc(x.title)}${x.t && x.t.basis ? ' <span class="tag">Ergänzung</span>' : ''}</span>
+      <span class="topic-title">${esc(x.title)}${x.t && x.t.basis ? ' <span class="tag">Ergänzung</span>' : ''}${x.t && x.t.privat ? ' <span class="tag">🔒 nur für dich</span>' : ''}</span>
       <span class="muted small">${x.builtin ? 'aus dem Lernheft' : `aus Fotos${when ? ' · zuletzt ' + when : ''}`}${d && d.zusammenfassung ? ' · ' + esc(d.zusammenfassung) : ''}</span>
       <span class="progress"><span style="width:${Math.round(p.pct * 100)}%"></span></span>
       <span class="muted small">${p.text || 'Noch nicht geübt'}</span>
@@ -740,6 +749,7 @@
   function onLoggedIn(res) {
     auth = { token: res.token, kid: { id: res.kind.id, name: res.kind.name, color: res.kind.color, rolle: res.kind.rolle, bild: res.kind.bild || null, material: !!res.kind.material } };
     saveAuth();
+    readRemoteCache();
     loadStore();
     store = mergeStores(store, res.kind.data);
     writeLocal(auth.kid.id, store);
@@ -749,6 +759,7 @@
     if (location.hash && location.hash !== '#/') location.hash = '#/';
     else route();
     syncKid(res.kind);
+    loadRemote();
   }
   function clearSession() {
     clearTimeout(syncTimer);
@@ -758,6 +769,7 @@
     lastFp = progressFp(store);
     currentFach = '';
     closeUserMenu();
+    readRemoteCache();
     if (location.hash && location.hash !== '#/') location.hash = '#/';
     else route();
   }
@@ -1057,14 +1069,12 @@
             <div class="uc-name"><span><b>${esc(u.name)}</b>${u.id === me.id ? ' <span class="tag">du</span>' : ''}</span>
               <span class="muted small">${u.rolle === 'admin' ? 'Admin' : 'Kind'} · ${u.hat_passwort ? 'Passwort gesetzt' : '<b>wartet auf erstes Anmelden</b>'} · zuletzt aktiv: ${when(u.zuletzt)}</span>
               <span class="muted small">Lernstand: ${u.stand.vokabeln} Vokabeln sicher · ${u.stand.uebungen} Übungen geschafft</span>
-              <span class="muted small">${u.rolle === 'admin' ? '📷 Darf neues Material hinzufügen (Admin)' : u.material ? '📷 Darf neues Material hinzufügen' : 'Darf kein neues Material hinzufügen'}</span>
             </div>
           </div>
           <div class="actions">
             <a class="btn" href="#/profilbild/${esc(u.id)}">Profilbild</a>
             <button class="btn" data-act="rename">Umbenennen</button>
             ${u.hat_passwort ? '<button class="btn" data-act="resetpw">Passwort zurücksetzen</button>' : ''}
-            ${u.rolle !== 'admin' ? `<button class="btn" data-act="material">${u.material ? 'Material sperren' : 'Material erlauben'}</button>` : ''}
             <button class="btn" data-act="rolle">${u.rolle === 'admin' ? 'Zum Kind machen' : 'Zum Admin machen'}</button>
             <button class="btn" data-act="resetstand">Lernstand löschen</button>
             ${u.id !== me.id ? '<button class="btn bad" data-act="delete">Löschen</button>' : ''}
@@ -1093,8 +1103,6 @@
           if (confirm(`Passwort von ${u.name} zurücksetzen? ${u.name} legt beim nächsten Anmelden ein neues fest und wird auf allen Geräten abgemeldet.`)) {
             run(() => syncCall('POST', 'user_update', { id: u.id, reset_passwort: true }));
           }
-        } else if (act === 'material') {
-          run(() => syncCall('POST', 'user_update', { id: u.id, material: !u.material }));
         } else if (act === 'rolle') {
           run(() => syncCall('POST', 'user_update', { id: u.id, rolle: u.rolle === 'admin' ? 'kind' : 'admin' }));
         } else if (act === 'resetstand') {
@@ -1114,7 +1122,7 @@
     const p = progressOf(x.subj);
     const ep = epocheOf(x);
     return `<a class="tile" href="${x.subj.route}" style="--c:${fachFarbe(x.subj.fach)}">
-      ${isNew ? '<span class="tile-badge">NEU</span>' : ''}
+      ${isNew ? '<span class="tile-badge">NEU</span>' : ''}${x.t && x.t.privat ? '<span class="tile-privat" title="Nur für dich sichtbar">🔒</span>' : ''}
       <span class="tile-icon" aria-hidden="true">${fachIcon(x.subj.fach)}</span>
       <span class="tile-kicker">${esc(fachName(x.subj.fach))}${ep ? ' · ' + esc(ep) : ''}</span>
       <span class="tile-title">${esc(x.title)}</span>
@@ -1172,7 +1180,7 @@
         <p>${esc(r.begruendung)}</p>
         ${parts.length ? `<p class="muted small">Erstellt: ${parts.join(' · ')}</p>` : ''}
         <a class="btn primary" href="#/t/${r.thema_id}">Jetzt lernen →</a>
-        ${r.basis ? ` <a class="btn" href="${String(r.basis).startsWith('repo-') ? '#/t/' + esc(String(r.basis).slice(5)) : '#/' + esc(r.fach)}">Zum Hauptthema</a>` : ''}
+        ${r.basis ? ` <a class="btn" href="${String(r.basis).startsWith('repo-') ? '#/t/' + esc(String(r.basis).slice(5)) : String(r.basis).startsWith('thema-') ? '#/t/' + esc(String(r.basis).slice(6)) : '#/' + esc(r.fach)}">Zum Hauptthema</a>` : ''}
       </div>`;
     }
     app.innerHTML = `
@@ -1313,7 +1321,7 @@
         `<a role="tab" href="${subj.route}/${id}" class="${id === tab ? 'active' : ''}" aria-selected="${id === tab}">${label}</a>`).join('')}</div>
       <div id="view"></div>
       <footer class="topic-foot">
-        ${t && !t.static && darfMaterial() ? `<form class="epoche-form" id="epForm">
+        ${darfBearbeiten(t) ? `<form class="epoche-form" id="epForm">
           <label for="epIn">Epoche</label>
           <input type="text" id="epIn" list="epList" value="${esc((t.data && t.data.epoche) || '')}" placeholder="z. B. Geometrie" maxlength="100">
           <datalist id="epList">${epochenOf(subj.fach).filter((g) => g.name).map((g) => `<option value="${esc(g.name)}">`).join('')}</datalist>
@@ -1322,7 +1330,7 @@
         <a class="btn" href="${printLink(subj.fach, epocheOf(t ? { t } : { builtin: true, subj }))}">🖨️ Lern-PDF dieser Epoche</a>
         ${t && t.static ? `<p class="muted small">Epoche: ${esc((t.data && t.data.epoche) || OHNE_EPOCHE)}</p>` : ''}
         ${t && !t.static ? `<p class="muted small">Aus ${verlauf.reduce((n, v) => n + (v.fotos || 0), 0)} Fotos erstellt${verlauf.length > 1 ? ` (${verlauf.length} Auswertungen)` : ''}.
-        ${isAdmin() ? '<button type="button" class="link" id="delTopic">Thema löschen</button>' : ''}</p>` : ''}
+        ${darfBearbeiten(t) ? '<button type="button" class="link" id="delTopic">Thema löschen</button>' : ''}</p>` : ''}
       </footer>`;
     const view = document.getElementById('view');
     ({
