@@ -31,7 +31,7 @@ const MIN_PASSWORT = 4;
 
 function kindOut(array $r, bool $withData): array
 {
-    $k = ['id' => $r['id'], 'name' => $r['name'], 'color' => $r['color'], 'rolle' => $r['rolle'], 'bild' => $r['bild'] ?? null, 'material' => canAddMaterial($r), 'ts' => (int)$r['ts']];
+    $k = ['id' => $r['id'], 'name' => $r['name'], 'color' => $r['color'], 'rolle' => $r['rolle'], 'bild' => $r['bild'] ?? null, 'material' => sharesUploads($r), 'ts' => (int)$r['ts']];
     if ($withData) {
         $d = json_decode($r['data'], true);
         $k['data'] = is_array($d) && $d ? $d : new stdClass();
@@ -224,7 +224,7 @@ try {
                 db()->prepare('UPDATE lernhilfe_kinder SET rolle = ? WHERE id = ?')->execute([$rolle, $r['id']]);
             }
             if (isset($b['material'])) {
-                db()->prepare('UPDATE lernhilfe_kinder SET material = ? WHERE id = ?')->execute([$b['material'] ? 1 : 0, $r['id']]);
+                db()->prepare('UPDATE lernhilfe_kinder SET teilt = ? WHERE id = ?')->execute([$b['material'] ? 1 : 0, $r['id']]);
             }
             if (array_key_exists('bild', $b)) {
                 db()->prepare('UPDATE lernhilfe_kinder SET bild = ? WHERE id = ?')->execute([cleanBild($b['bild']), $r['id']]);

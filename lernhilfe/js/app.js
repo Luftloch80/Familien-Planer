@@ -20,7 +20,9 @@
   // Neues Material hinzufügen: Admins und freigeschaltete Kinder
   const darfMaterial = () => FOTOS_AKTIV && !!currentKid();
   // Thema ändern/löschen: eigene Themen, gemeinsame nur als Admin
-  const darfBearbeiten = (t) => !!(t && !t.static && currentKid() && (t.privat || currentKid().rolle === 'admin'));
+  const teiltUploads = () => !!(currentKid() && (currentKid().rolle === 'admin' || currentKid().material));
+  const darfBearbeiten = (t) => !!(t && !t.static && currentKid() && (t.privat || teiltUploads()));
+  const darfLoeschen = (t) => !!(t && !t.static && currentKid() && (t.privat || isAdmin()));
   function saveAuth() {
     try { if (auth) localStorage.setItem(AKEY, JSON.stringify(auth)); else localStorage.removeItem(AKEY); } catch (e) { /* egal */ }
   }
@@ -1069,12 +1071,14 @@
             <div class="uc-name"><span><b>${esc(u.name)}</b>${u.id === me.id ? ' <span class="tag">du</span>' : ''}</span>
               <span class="muted small">${u.rolle === 'admin' ? 'Admin' : 'Kind'} · ${u.hat_passwort ? 'Passwort gesetzt' : '<b>wartet auf erstes Anmelden</b>'} · zuletzt aktiv: ${when(u.zuletzt)}</span>
               <span class="muted small">Lernstand: ${u.stand.vokabeln} Vokabeln sicher · ${u.stand.uebungen} Übungen geschafft</span>
+              <span class="muted small">${u.rolle === 'admin' || u.material ? '🌍 Uploads gelten für alle' : '🔒 Uploads nur für sich selbst'}</span>
             </div>
           </div>
           <div class="actions">
             <a class="btn" href="#/profilbild/${esc(u.id)}">Profilbild</a>
             <button class="btn" data-act="rename">Umbenennen</button>
             ${u.hat_passwort ? '<button class="btn" data-act="resetpw">Passwort zurücksetzen</button>' : ''}
+            ${u.rolle !== 'admin' ? `<button class="btn" data-act="material">${u.material ? 'Uploads nur privat' : 'Uploads für alle'}</button>` : ''}
             <button class="btn" data-act="rolle">${u.rolle === 'admin' ? 'Zum Kind machen' : 'Zum Admin machen'}</button>
             <button class="btn" data-act="resetstand">Lernstand löschen</button>
             ${u.id !== me.id ? '<button class="btn bad" data-act="delete">Löschen</button>' : ''}
@@ -1103,6 +1107,8 @@
           if (confirm(`Passwort von ${u.name} zurücksetzen? ${u.name} legt beim nächsten Anmelden ein neues fest und wird auf allen Geräten abgemeldet.`)) {
             run(() => syncCall('POST', 'user_update', { id: u.id, reset_passwort: true }));
           }
+        } else if (act === 'material') {
+          run(() => syncCall('POST', 'user_update', { id: u.id, material: !u.material }));
         } else if (act === 'rolle') {
           run(() => syncCall('POST', 'user_update', { id: u.id, rolle: u.rolle === 'admin' ? 'kind' : 'admin' }));
         } else if (act === 'resetstand') {
@@ -1187,6 +1193,7 @@
       <section class="hero small-hero">
         <h1>Neues Material</h1>
         <p>Fotografiere Arbeitsblätter, Buchseiten oder Hefteinträge. Lernflix erkennt automatisch das Fach und ob es ein neues Thema ist – und macht daraus Vokabeln, Erklärungen und Übungen.</p>
+        <p class="muted small">${teiltUploads() ? '🌍 Was du hier hinzufügst, sehen alle.' : '🔒 Was du hier hinzufügst, siehst nur du.'}</p>
       </section>
       <section class="card photo-card">
         ${apiOk === false ? '<div class="msg almost">Die Fotoerkennung ist gerade nicht erreichbar. Sie funktioniert nur, wenn die Seite auf dem Server läuft.</div>' : ''}
@@ -1330,7 +1337,7 @@
         <a class="btn" href="${printLink(subj.fach, epocheOf(t ? { t } : { builtin: true, subj }))}">🖨️ Lern-PDF dieser Epoche</a>
         ${t && t.static ? `<p class="muted small">Epoche: ${esc((t.data && t.data.epoche) || OHNE_EPOCHE)}</p>` : ''}
         ${t && !t.static ? `<p class="muted small">Aus ${verlauf.reduce((n, v) => n + (v.fotos || 0), 0)} Fotos erstellt${verlauf.length > 1 ? ` (${verlauf.length} Auswertungen)` : ''}.
-        ${darfBearbeiten(t) ? '<button type="button" class="link" id="delTopic">Thema löschen</button>' : ''}</p>` : ''}
+        ${darfLoeschen(t) ? '<button type="button" class="link" id="delTopic">Thema löschen</button>' : ''}</p>` : ''}
       </footer>`;
     const view = document.getElementById('view');
     ({

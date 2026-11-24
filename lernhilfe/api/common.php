@@ -51,6 +51,11 @@ function db(): PDO
     if (!in_array('pass_hash', $cols, true)) $pdo->exec('ALTER TABLE lernhilfe_kinder ADD pass_hash VARCHAR(255) NULL');
     if (!in_array('rolle', $cols, true)) $pdo->exec("ALTER TABLE lernhilfe_kinder ADD rolle VARCHAR(10) NOT NULL DEFAULT 'kind'");
     if (!in_array('bild', $cols, true)) $pdo->exec('ALTER TABLE lernhilfe_kinder ADD bild MEDIUMTEXT NULL');
+    if (!in_array('teilt', $cols, true)) {
+        // Uploads gelten für alle (Admins immer); anfangs nur für Emma
+        $pdo->exec('ALTER TABLE lernhilfe_kinder ADD teilt TINYINT(1) NOT NULL DEFAULT 0');
+        $pdo->exec("UPDATE lernhilfe_kinder SET teilt = 1 WHERE LOWER(name) = 'emma'");
+    }
     if (!in_array('material', $cols, true)) {
         // Recht, neues Material (Fotos) hinzuzufügen; Admins dürfen es immer
         $pdo->exec('ALTER TABLE lernhilfe_kinder ADD material TINYINT(1) NOT NULL DEFAULT 0');
@@ -150,10 +155,16 @@ function requireUser(): array
     return $u;
 }
 
-// Neues Material darf jeder angemeldete Benutzer hinzufügen (es bleibt privat)
+// Neues Material darf jeder angemeldete Benutzer hinzufügen. Uploads von Admins
+// und von Kindern mit dem Recht "teilt" gelten für alle, sonst bleiben sie privat.
 function canAddMaterial(array $u): bool
 {
     return true;
+}
+
+function sharesUploads(array $u): bool
+{
+    return $u['rolle'] === 'admin' || (int)($u['teilt'] ?? 0) === 1;
 }
 
 function requireMaterial(): array

@@ -10,7 +10,8 @@
 // POST api.php?action=delete   {"id":123}  -> Thema löschen
 //
 // Alle Aktionen außer list verlangen eine Anmeldung (Header X-Lernhilfe-Token).
-// Neue Themen gehören dem Benutzer, der sie hochlädt; bestehende (besitzer NULL) sind für alle.
+// Neue Themen gehören dem Benutzer, der sie hochlädt; Uploads von Admins und Kindern mit
+// dem Recht "teilt" sowie alle älteren Themen (besitzer NULL) sind für alle.
 
 declare(strict_types=1);
 
@@ -267,7 +268,7 @@ function analyze(): void
     }
 
     $result = cleanResult($result);
-    echo json_encode(saveResult($result, $themen, count($images), $user['id']), JSON_FLAGS);
+    echo json_encode(saveResult($result, $themen, count($images), $user['id'], sharesUploads($user)), JSON_FLAGS);
 }
 
 // Lücken und ___ in Einklang bringen, leere Einträge entfernen
@@ -307,7 +308,7 @@ function cleanResult(array $r): array
     return $r;
 }
 
-function saveResult(array $r, array $themen, int $fotos, string $owner): array
+function saveResult(array $r, array $themen, int $fotos, string $owner, bool $fuerAlle): array
 {
     $fach = array_key_exists($r['fach'], FAECHER) ? $r['fach'] : 'sonstiges';
     $id = trim((string)$r['thema_id']);
@@ -325,7 +326,7 @@ function saveResult(array $r, array $themen, int $fotos, string $owner): array
         foreach (basisThemen() as $b) if ($b['id'] === $basis) { $basisTitel = $b['titel']; $basisFach = $b['fach']; $basisEpoche = (string)($b['epoche'] ?? ''); }
     } elseif ($id !== '') {
         foreach ($themen as $t) if ((string)$t['id'] === $id) { $target = $t; break; }
-        if ($target && !$target['privat']) {
+        if ($target && !$target['privat'] && !$fuerAlle) {
             // gemeinsames Thema bleibt unverändert: Ergänzung als eigenes privates Thema
             $basis = 'thema-' . $target['id'];
             $basisTitel = preg_replace('/^Ergänzung: /u', '', $target['titel']);
@@ -335,7 +336,7 @@ function saveResult(array $r, array $themen, int $fotos, string $owner): array
         }
     }
     if ($basis) {
-        foreach ($themen as $t) if ($t['privat'] && ($t['basis'] ?? '') === $basis) { $target = $t; break; }
+        foreach ($themen as $t) if ($t['privat'] === !$fuerAlle && ($t['basis'] ?? '') === $basis) { $target = $t; break; }
     }
     $neu = $id === '';
 
@@ -359,8 +360,8 @@ function saveResult(array $r, array $themen, int $fotos, string $owner): array
         $d['uebungen'] = array_merge($d['uebungen'] ?? [], $neuerTeil['uebungen']);
         $d['verlauf'][] = ['datum' => $now, 'fotos' => $fotos, 'titel' => $r['titel']];
         if (trim((string)($d['epoche'] ?? '')) === '') $d['epoche'] = trim((string)($r['epoche'] ?? ''));
-        $stmt = db()->prepare('UPDATE lernhilfe_themen SET data = ? WHERE id = ? AND besitzer = ?');
-        $stmt->execute([json_encode($d, JSON_FLAGS), $target['id'], $owner]);
+        $stmt = db()->prepare('UPDATE lernhilfe_themen SET data = ? WHERE id = ? AND (besitzer = ? OR (besitzer IS NULL AND ?))');
+        $stmt->execute([json_encode($d, JSON_FLAGS), $target['id'], $owner, $fuerAlle ? 1 : 0]);
         $themaId = $target['id'];
         $titel = $target['titel'];
     } else {
@@ -373,7 +374,7 @@ function saveResult(array $r, array $themen, int $fotos, string $owner): array
             'verlauf' => [['datum' => $now, 'fotos' => $fotos, 'titel' => $r['titel']]],
         ];
         $stmt = db()->prepare('INSERT INTO lernhilfe_themen (fach, basis, titel, data, besitzer) VALUES (?, ?, ?, ?, ?)');
-        $stmt->execute([$fach, $basis, mb_substr($titel, 0, 255), json_encode($d, JSON_FLAGS), $owner]);
+        $stmt->execute([$fach, $basis, mb_substr($titel, 0, 255), json_encode($d, JSON_FLAGS), $fuerAlle ? null : $owner]);
         $themaId = (int)db()->lastInsertId();
     }
 
@@ -386,6 +387,7 @@ function saveResult(array $r, array $themen, int $fotos, string $owner): array
         'thema_id' => $themaId,
         'titel' => $titel,
         'abschnitt' => $r['titel'],
+        'fuer_alle' => $fuerAlle,
         'begruendung' => $r['begruendung'],
         'anzahl' => [
             'vokabeln' => count($r['vokabeln']),
@@ -404,7 +406,7 @@ function editableThema(array $u, int $id): array
     $stmt->execute([$id]);
     $row = $stmt->fetch();
     if (!$row || ($row['besitzer'] !== null && $row['besitzer'] !== $u['id'])) fail(404, 'Thema nicht gefunden');
-    if ($row['besitzer'] === null && $u['rolle'] !== 'admin') fail(403, 'Gemeinsame Themen kann nur ein Admin ändern.');
+    if ($row['besitzer'] === null && !sharesUploads($u)) fail(403, 'Gemeinsame Themen können nur bestimmte Benutzer ändern.');
     return $row;
 }
 
@@ -427,6 +429,7 @@ function deleteThema(): void
     $u = requireUser();
     $body = readJsonBody();
     $row = editableThema($u, (int)($body['id'] ?? 0));
+    if ($row['besitzer'] === null && $u['rolle'] !== 'admin') fail(403, 'Gemeinsame Themen kann nur ein Admin löschen.');
     db()->prepare('DELETE FROM lernhilfe_themen WHERE id = ?')->execute([$row['id']]);
     echo json_encode(['ok' => true, 'themen' => loadThemen()], JSON_FLAGS);
 }
