@@ -12,6 +12,7 @@
   --ok: #2f9e58;
   --home-bg: #d3f3d8;
   --flight-red-bg: #f6cfcb;
+  --standby-bg: #fbeaa0;
 
   font: 16px/1.5 -apple-system, 'Segoe UI', system-ui, Roboto, sans-serif;
   color-scheme: light dark;
@@ -32,6 +33,7 @@
     --accent-contrast: #17161a;
     --home-bg: #1f3d28;
     --flight-red-bg: #4a2320;
+    --standby-bg: #4d4214;
   }
 }
 

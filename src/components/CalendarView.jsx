@@ -134,7 +134,10 @@ export default function CalendarView({ data }) {
     // Orange-Hinweis (früher Check-in morgen oder Umlauf-Start nach
     // 09:00 heute) und bekannten Layover-Tagen (awayDates) gilt als
     // Zuhause-Tag, auch ohne explizite Daten.
-    const isHome = showFlightColors && !isFlightDay && !isOrange && !isAway
+    // Gelb: Standby- oder Reserve-Dienst (S…/REP im Dienstplan) - man ist zu
+    // Hause, kann aber jederzeit gerufen werden. Flugfarben haben Vorrang.
+    const isStandby = showFlightColors && (data.standbyDates ?? []).includes(info.dateISO) && !isFlightDay && !isOrange && !isAway && !isLanding
+    const isHome = showFlightColors && !isFlightDay && !isOrange && !isAway && !isStandby
     // Rot: reine Flugtage (nicht orange, nicht Landetag) und Layover-Tage
     // ohne eigenen Flug (awayDates) - beides Tage, an denen man nicht zu
     // Hause ist. Landetage bekommen stattdessen ihre eigene halb-rot/-grüne
@@ -145,6 +148,7 @@ export default function CalendarView({ data }) {
       !info.school ? 'calendar-cell-off' : '',
       isHome ? 'calendar-cell-home' : '',
       isRed ? 'calendar-cell-red' : '',
+      isStandby ? 'calendar-cell-standby' : '',
       isOrange ? 'calendar-cell-early' : '',
       isLanding ? 'calendar-cell-landing' : '',
       isToday ? 'calendar-cell-today' : '',
@@ -274,6 +278,8 @@ export default function CalendarView({ data }) {
           Zu Hause
           <span className="calendar-legend-dot" style={{ background: 'var(--flight-red-bg)' }} />
           Flugtag
+          <span className="calendar-legend-dot" style={{ background: 'var(--standby-bg)' }} />
+          Standby/Reserve
         </p>
       )}
 

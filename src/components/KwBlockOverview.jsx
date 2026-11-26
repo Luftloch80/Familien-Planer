@@ -11,7 +11,8 @@ function eventLine(title, time, endTime) {
 }
 
 // Nur als Text statt Farbe, da der Drucker schwarz-weiß ist: "Frei" (zu
-// Hause), "Flugtag" (Flug oder Layover unterwegs) und "Anreise" für
+// Hause), "Flugtag" (Flug oder Layover unterwegs), "Standby" (Standby- oder
+// Reserve-Dienst) und "Anreise" für
 // Übergangstage (früher Check-in am Folgetag oder Umlauf-Start heute).
 function dutyLabel(dateISO, data) {
   const isOrange = (data.orangeDates ?? []).includes(dateISO)
@@ -19,6 +20,7 @@ function dutyLabel(dateISO, data) {
   const isFlight = (data.flightDates ?? []).includes(dateISO)
   const isAway = (data.awayDates ?? []).includes(dateISO)
   if (isFlight || isAway) return 'Flugtag'
+  if ((data.standbyDates ?? []).includes(dateISO)) return 'Standby'
   return 'Frei'
 }
 

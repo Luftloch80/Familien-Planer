@@ -27,6 +27,7 @@ const DEFAULT_DATA = {
   orangeDates: [],
   awayDates: [],
   landingDates: [],
+  standbyDates: [],
 }
 
 function readJSON(key, fallback) {
