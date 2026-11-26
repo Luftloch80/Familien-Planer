@@ -4,7 +4,7 @@ import { weekdayName, addDays, isSameDate } from '../lib/dates.js'
 import { isSchoolDay, holidayLabel, extraSchoolDayLabel, feiertagLabel } from '../lib/holidays.js'
 import { pickupTimeMatches, resolvePickup } from '../lib/pickup.js'
 import { useUpdateAvailable } from '../lib/useUpdateAvailable.js'
-import { FOOD_ORDER_URL } from '../data/kids.js'
+import { FOOD_ORDER_URL, PARENT_PORTAL_URL } from '../data/kids.js'
 import KidDayCard from './KidDayCard.jsx'
 import DayScroller from './DayScroller.jsx'
 
@@ -82,6 +82,15 @@ export default function TodayView({ data, store }) {
           rel="noopener noreferrer"
         >
           🍽️ Cantinorant
+        </a>
+
+        <a
+          className="external-link-btn"
+          href={PARENT_PORTAL_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          👪 Elternportal
         </a>
 
         {updateAvailable && (

@@ -7,6 +7,7 @@ export { WEEKDAYS } from '../lib/dates.js'
 
 export const EXCUSE_URL = 'https://gutenhalde.de/schueler-entschuldigen/'
 export const FOOD_ORDER_URL = 'https://gutenhalde.cantinorant.com'
+export const PARENT_PORTAL_URL = 'https://elternportal.triargos.de/login'
 
 export const KIDS = [
   {
